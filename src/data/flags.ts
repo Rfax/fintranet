@@ -1,0 +1,465 @@
+import type { FeatureFlag, SyntheticFlagUser } from '@/types'
+import { daysAgo, daysFromNow, hoursAgo } from './time'
+
+/** Synthetic end users used by the effective-flag debugger. */
+export const syntheticFlagUsers: SyntheticFlagUser[] = [
+  {
+    id: 'u_10231',
+    name: 'Ana Ferreira',
+    email: 'ana.ferreira@example.com',
+    plan: 'pro',
+    country: 'PT',
+    segments: ['beta_testers', 'high_volume'],
+  },
+  {
+    id: 'u_10488',
+    name: 'Deshawn Price',
+    email: 'deshawn.price@example.com',
+    plan: 'free',
+    country: 'US',
+    segments: [],
+  },
+  {
+    id: 'u_10702',
+    name: 'Yuki Tanaka',
+    email: 'yuki.tanaka@example.com',
+    plan: 'enterprise',
+    country: 'JP',
+    segments: ['enterprise_pilot'],
+  },
+]
+
+export const featureFlags: FeatureFlag[] = [
+  {
+    key: 'instant-payout-v2',
+    name: 'Instant payout v2',
+    description:
+      'Routes eligible payouts through the v2 instant rails with a same-day fallback when the rail is unavailable.',
+    lifecycle: 'rollout',
+    ownerTeam: 'Payments Engineering',
+    ownerId: 'usr_jonah',
+    defaultValue: false,
+    environments: [
+      { environment: 'development', enabled: true, rolloutPercentage: 100, updatedAt: daysAgo(21), updatedById: 'usr_jonah' },
+      { environment: 'staging', enabled: true, rolloutPercentage: 100, updatedAt: daysAgo(14), updatedById: 'usr_jonah' },
+      { environment: 'production', enabled: true, rolloutPercentage: 35, updatedAt: hoursAgo(9), updatedById: 'usr_mateo' },
+    ],
+    targetingRules: [
+      {
+        id: 'rule_ip_1',
+        attribute: 'segment',
+        operator: 'in',
+        values: ['beta_testers'],
+        value: true,
+        description: 'Beta testers always receive v2 rails.',
+      },
+      {
+        id: 'rule_ip_2',
+        attribute: 'country',
+        operator: 'not_in',
+        values: ['JP', 'BR'],
+        value: false,
+        description: 'Excluded markets stay on v1 until rail certification completes.',
+      },
+    ],
+    personalOverrides: [
+      {
+        userId: 'usr_jonah',
+        userName: 'Jonah Beckett',
+        value: true,
+        reason: 'Reproducing payout latency report',
+        createdAt: hoursAgo(30),
+        expiresAt: daysFromNow(2),
+        environment: 'production',
+      },
+    ],
+    codeLocations: [
+      {
+        id: 'loc_ip_1',
+        repository: 'fintranet/payments-service',
+        service: 'payments-service',
+        branch: 'main',
+        commit: '9f2c41a',
+        filePath: 'src/payouts/router.ts',
+        line: 84,
+        language: 'typescript',
+        usageType: 'evaluation',
+        snippet: `const useInstantV2 = await flags.evaluate('instant-payout-v2', {
+  userId: payout.userId,
+  country: payout.country,
+})
+
+return useInstantV2 ? instantRailV2(payout) : sameDayRail(payout)`,
+        highlightLine: 1,
+        lastModifiedAt: daysAgo(6),
+        lastModifiedBy: 'Jonah Beckett',
+      },
+      {
+        id: 'loc_ip_2',
+        repository: 'fintranet/payments-service',
+        service: 'payments-service',
+        branch: 'main',
+        commit: '9f2c41a',
+        filePath: 'src/payouts/router.test.ts',
+        line: 31,
+        language: 'typescript',
+        usageType: 'test',
+        snippet: `it('falls back to the same-day rail when the flag is off', async () => {
+  flags.setForTest('instant-payout-v2', false)
+  await expect(routePayout(payout)).resolves.toMatchObject({ rail: 'same-day' })
+})`,
+        highlightLine: 2,
+        lastModifiedAt: daysAgo(6),
+        lastModifiedBy: 'Jonah Beckett',
+      },
+      {
+        id: 'loc_ip_3',
+        repository: 'fintranet/mobile-app',
+        service: 'mobile-app',
+        branch: 'release/8.4',
+        commit: 'c71ba03',
+        filePath: 'app/payouts/PayoutSpeedLabel.kt',
+        line: 22,
+        language: 'kotlin',
+        usageType: 'experiment_exposure',
+        snippet: `val instant = flags.isEnabled("instant-payout-v2")
+analytics.exposure("instant-payout-v2", instant)
+label.text = if (instant) R.string.payout_instant else R.string.payout_same_day`,
+        highlightLine: 1,
+        lastModifiedAt: daysAgo(12),
+        lastModifiedBy: 'Rhea Kapoor',
+      },
+    ],
+    dependencies: [
+      {
+        flagKey: 'payout-rail-health-check',
+        relationship: 'requires',
+        description: 'Instant v2 only routes when the rail health check flag is enabled.',
+      },
+    ],
+    resources: [
+      { label: 'PRD: Instant payouts v2', type: 'prd', url: '#prd-instant-payout-v2' },
+      { label: 'Runbook: rail failover', type: 'runbook', url: '#runbook-rail-failover' },
+      { label: 'PAY-2291', type: 'ticket', url: '#pay-2291' },
+    ],
+    rolloutPlan: [
+      { label: 'Internal', percentage: 1, scheduledFor: daysAgo(14), state: 'complete' },
+      { label: 'Early access', percentage: 10, scheduledFor: daysAgo(7), state: 'complete' },
+      { label: 'Broad', percentage: 35, scheduledFor: hoursAgo(9), state: 'active' },
+      { label: 'General availability', percentage: 100, scheduledFor: daysFromNow(6), state: 'scheduled' },
+    ],
+    rolloutCriteria: 'Payout failure rate stays below 0.4% for 72 hours at each stage.',
+    rollbackCriteria: 'Any 15-minute window above 2% payout failure, or a rail incident of severity 2 or higher.',
+    signals: [
+      {
+        id: 'sig_flag_ip_1',
+        type: 'broad_production_exposure',
+        severity: 'high',
+        confidence: 1,
+        headline: 'Enabled for an estimated 148,000 production users',
+        explanation:
+          '35% production rollout across a 424,000-user base, with money movement in the affected path.',
+        evidence: [
+          { label: 'Environment', value: 'production' },
+          { label: 'Rollout', value: '35%' },
+          { label: 'Estimated audience', value: '148,400 users' },
+        ],
+        source: 'Flag service (synthetic)',
+        detectedAt: hoursAgo(9),
+      },
+      {
+        id: 'sig_flag_ip_2',
+        type: 'scheduled_rollout',
+        severity: 'medium',
+        confidence: 1,
+        headline: 'Next rollout stage is scheduled in 6 days',
+        explanation: 'Stage 4 moves the flag to 100% unless the rollback criteria trigger first.',
+        evidence: [
+          { label: 'Current stage', value: 'Broad (35%)' },
+          { label: 'Next stage', value: 'General availability (100%)' },
+        ],
+        source: 'Rollout plan (synthetic)',
+        detectedAt: hoursAgo(9),
+      },
+    ],
+    createdAt: daysAgo(46),
+    updatedAt: hoursAgo(9),
+    estimatedAudience: 424_000,
+  },
+  {
+    key: 'legacy-statement-export',
+    name: 'Legacy statement export',
+    description: 'Keeps the pre-2023 CSV statement exporter available alongside the current exporter.',
+    lifecycle: 'cleanup',
+    ownerTeam: 'Core Banking',
+    ownerId: 'usr_jonah',
+    defaultValue: true,
+    environments: [
+      { environment: 'development', enabled: true, rolloutPercentage: 100, updatedAt: daysAgo(700), updatedById: 'usr_jonah' },
+      { environment: 'staging', enabled: true, rolloutPercentage: 100, updatedAt: daysAgo(700), updatedById: 'usr_jonah' },
+      { environment: 'production', enabled: true, rolloutPercentage: 100, updatedAt: daysAgo(640), updatedById: 'usr_jonah' },
+    ],
+    targetingRules: [],
+    personalOverrides: [],
+    codeLocations: [
+      {
+        id: 'loc_ls_1',
+        repository: 'fintranet/core-banking',
+        service: 'statements',
+        branch: 'main',
+        commit: '3ad0e12',
+        filePath: 'statements/export.py',
+        line: 140,
+        language: 'python',
+        usageType: 'fallback',
+        snippet: `if flags.is_enabled("legacy-statement-export"):
+    return legacy_csv_export(account, period)
+return statement_export_v3(account, period)`,
+        highlightLine: 1,
+        lastModifiedAt: daysAgo(520),
+        lastModifiedBy: 'Marcus Hale',
+      },
+    ],
+    dependencies: [],
+    resources: [{ label: 'CORE-880 cleanup ticket', type: 'ticket', url: '#core-880' }],
+    rolloutCriteria: undefined,
+    rollbackCriteria: undefined,
+    signals: [
+      {
+        id: 'sig_flag_ls_1',
+        type: 'stale_flag',
+        severity: 'medium',
+        confidence: 0.92,
+        headline: 'Unchanged for 640 days with one remaining reference',
+        explanation:
+          'The flag has been fully on in production for 21 months and guards a single fallback path. It is a cleanup candidate.',
+        evidence: [
+          { label: 'Last production change', value: '640 days ago' },
+          { label: 'Code references', value: '1' },
+          { label: 'Owner', value: 'Core Banking' },
+        ],
+        source: 'Flag hygiene scan (synthetic)',
+        detectedAt: daysAgo(2),
+      },
+    ],
+    createdAt: daysAgo(910),
+    updatedAt: daysAgo(640),
+    expectedRemovalAt: daysAgo(200),
+    estimatedAudience: 424_000,
+  },
+  {
+    key: 'kyc-adaptive-review',
+    name: 'Adaptive KYC review layout',
+    description:
+      'Renders the reviewer-facing case page using the adaptive focus panel instead of the uniform record form.',
+    lifecycle: 'development',
+    ownerTeam: 'Internal Tools',
+    ownerId: 'usr_priya',
+    defaultValue: false,
+    environments: [
+      { environment: 'development', enabled: true, rolloutPercentage: 100, updatedAt: hoursAgo(4), updatedById: 'usr_priya' },
+      { environment: 'staging', enabled: true, rolloutPercentage: 50, updatedAt: daysAgo(1), updatedById: 'usr_priya' },
+      { environment: 'production', enabled: false, rolloutPercentage: 0, updatedAt: daysAgo(1), updatedById: 'usr_priya' },
+    ],
+    targetingRules: [
+      {
+        id: 'rule_kar_1',
+        attribute: 'email',
+        operator: 'matches',
+        values: ['*@fintranet.example'],
+        value: true,
+        description: 'Internal staff see the adaptive layout in every environment.',
+      },
+    ],
+    personalOverrides: [
+      {
+        userId: 'usr_dana',
+        userName: 'Dana Whitfield',
+        value: true,
+        reason: 'Reviewing the new layout before the operations walkthrough',
+        createdAt: hoursAgo(5),
+        environment: 'staging',
+      },
+    ],
+    codeLocations: [
+      {
+        id: 'loc_kar_1',
+        repository: 'fintranet/ops-console',
+        service: 'ops-console',
+        branch: 'main',
+        commit: '5b81c77',
+        filePath: 'src/pages/KycCaseDetailPage.tsx',
+        line: 48,
+        language: 'typescript',
+        usageType: 'evaluation',
+        snippet: `const adaptive = useFlag('kyc-adaptive-review')
+
+return adaptive ? <AdaptiveCaseHeader case={kycCase} /> : <UniformCaseHeader case={kycCase} />`,
+        highlightLine: 1,
+        lastModifiedAt: hoursAgo(30),
+        lastModifiedBy: 'Priya Raghavan',
+      },
+    ],
+    dependencies: [],
+    resources: [
+      { label: 'Design: adaptive case detail', type: 'design', url: '#design-adaptive-case' },
+      { label: 'OPS-141', type: 'ticket', url: '#ops-141' },
+    ],
+    signals: [
+      {
+        id: 'sig_flag_kar_1',
+        type: 'development_flag',
+        severity: 'low',
+        confidence: 1,
+        headline: 'Development flag, off in production',
+        explanation: 'Editing is low risk here; production remains disabled with no targeting rules applied.',
+        evidence: [
+          { label: 'Production state', value: 'Disabled' },
+          { label: 'Staging rollout', value: '50%' },
+        ],
+        source: 'Flag service (synthetic)',
+        detectedAt: hoursAgo(4),
+      },
+    ],
+    createdAt: daysAgo(12),
+    updatedAt: hoursAgo(4),
+    estimatedAudience: 320,
+  },
+  {
+    key: 'refund-auto-approve-threshold',
+    name: 'Refund auto-approve threshold',
+    description:
+      'Raises the value below which low-risk refunds bypass manual review from $25 to $75.',
+    lifecycle: 'rollback',
+    ownerTeam: 'Payments Operations',
+    ownerId: 'usr_mateo',
+    defaultValue: false,
+    environments: [
+      { environment: 'development', enabled: true, rolloutPercentage: 100, updatedAt: daysAgo(9), updatedById: 'usr_mateo' },
+      { environment: 'staging', enabled: true, rolloutPercentage: 100, updatedAt: daysAgo(9), updatedById: 'usr_mateo' },
+      { environment: 'production', enabled: false, rolloutPercentage: 0, updatedAt: hoursAgo(2), updatedById: 'usr_mateo' },
+    ],
+    targetingRules: [],
+    personalOverrides: [],
+    codeLocations: [
+      {
+        id: 'loc_rat_1',
+        repository: 'fintranet/refund-service',
+        service: 'refund-service',
+        branch: 'main',
+        commit: 'de41f09',
+        filePath: 'internal/refunds/policy.go',
+        line: 67,
+        language: 'go',
+        usageType: 'evaluation',
+        snippet: `threshold := 2500 // minor units
+if flags.Enabled(ctx, "refund-auto-approve-threshold") {
+    threshold = 7500
+}`,
+        highlightLine: 2,
+        lastModifiedAt: daysAgo(9),
+        lastModifiedBy: 'Mateo Alvarez',
+      },
+    ],
+    dependencies: [
+      {
+        flagKey: 'instant-payout-v2',
+        relationship: 'blocks',
+        description: 'Auto-approval stays off while instant payout v2 is mid-rollout.',
+      },
+    ],
+    resources: [{ label: 'Runbook: refund auto-approval', type: 'runbook', url: '#runbook-refund-auto' }],
+    rollbackCriteria: 'Disputed auto-approved refunds above 0.8% in any 24-hour window.',
+    signals: [
+      {
+        id: 'sig_flag_rat_1',
+        type: 'recent_risky_change',
+        severity: 'high',
+        confidence: 1,
+        headline: 'Disabled in production 2 hours ago after a dispute spike',
+        explanation:
+          'Production went from enabled at 100% to disabled. The before-and-after configuration is preserved for review.',
+        evidence: [
+          { label: 'Before', value: 'production: on, 100%', conflicting: true },
+          { label: 'After', value: 'production: off, 0%', conflicting: true },
+          { label: 'Changed by', value: 'Mateo Alvarez' },
+        ],
+        source: 'Flag activity (synthetic)',
+        detectedAt: hoursAgo(2),
+      },
+      {
+        id: 'sig_flag_rat_2',
+        type: 'dependent_flag',
+        severity: 'medium',
+        confidence: 1,
+        headline: 'Blocked by instant-payout-v2 rollout',
+        explanation: 'Re-enabling is gated on the payout rollout reaching general availability.',
+        evidence: [{ label: 'Blocking flag', value: 'instant-payout-v2' }],
+        source: 'Dependency graph (synthetic)',
+        detectedAt: hoursAgo(2),
+      },
+    ],
+    createdAt: daysAgo(60),
+    updatedAt: hoursAgo(2),
+    estimatedAudience: 424_000,
+  },
+  {
+    key: 'payout-rail-health-check',
+    name: 'Payout rail health check',
+    description: 'Runs a pre-flight health probe against the instant payout rail before routing.',
+    lifecycle: 'permanent',
+    ownerTeam: 'Payments Engineering',
+    ownerId: 'usr_jonah',
+    defaultValue: true,
+    environments: [
+      { environment: 'development', enabled: true, rolloutPercentage: 100, updatedAt: daysAgo(120), updatedById: 'usr_jonah' },
+      { environment: 'staging', enabled: true, rolloutPercentage: 100, updatedAt: daysAgo(120), updatedById: 'usr_jonah' },
+      { environment: 'production', enabled: true, rolloutPercentage: 100, updatedAt: daysAgo(90), updatedById: 'usr_jonah' },
+    ],
+    targetingRules: [],
+    personalOverrides: [],
+    codeLocations: [
+      {
+        id: 'loc_prh_1',
+        repository: 'fintranet/payments-service',
+        service: 'payments-service',
+        branch: 'main',
+        commit: '9f2c41a',
+        filePath: 'src/payouts/health.ts',
+        line: 19,
+        language: 'typescript',
+        usageType: 'evaluation',
+        snippet: `if (await flags.evaluate('payout-rail-health-check', ctx)) {
+  await probeRail(rail)
+}`,
+        highlightLine: 1,
+        lastModifiedAt: daysAgo(90),
+        lastModifiedBy: 'Jonah Beckett',
+      },
+    ],
+    dependencies: [
+      {
+        flagKey: 'instant-payout-v2',
+        relationship: 'blocks',
+        description: 'Disabling this probe would stop instant payout v2 from routing.',
+      },
+    ],
+    resources: [{ label: 'Runbook: rail probe', type: 'runbook', url: '#runbook-rail-probe' }],
+    signals: [
+      {
+        id: 'sig_flag_prh_1',
+        type: 'dependent_flag',
+        severity: 'medium',
+        confidence: 1,
+        headline: 'One downstream flag depends on this probe',
+        explanation: 'instant-payout-v2 requires this flag to stay enabled in production.',
+        evidence: [{ label: 'Downstream', value: 'instant-payout-v2' }],
+        source: 'Dependency graph (synthetic)',
+        detectedAt: daysAgo(90),
+      },
+    ],
+    createdAt: daysAgo(400),
+    updatedAt: daysAgo(90),
+    estimatedAudience: 424_000,
+  },
+]
