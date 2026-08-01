@@ -39,18 +39,17 @@ export function FlagDebuggerPage() {
           title="Select a synthetic user"
           description={`Evaluation is simulated against the ${environment} environment and does not use the runtime SDK.`}
         >
-          <div className="flex flex-wrap items-end gap-3">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
             <FilterSelect
               label="User"
               value={userId}
               onChange={setUserId}
-              options={[
-                { value: '', label: 'Choose a user' },
-                ...(users.data ?? []).map((user) => ({
-                  value: user.id,
-                  label: `${user.name} (${user.id})`,
-                })),
-              ]}
+              placeholder="Choose a user"
+              triggerClassName="w-[260px]"
+              options={(users.data ?? []).map((user) => ({
+                value: user.id,
+                label: `${user.name} (${user.id})`,
+              }))}
             />
             {selectedUser ? (
               <DetailList

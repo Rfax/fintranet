@@ -55,16 +55,26 @@ interface FilterSelectProps {
   value: string
   onChange: (value: string) => void
   options: { value: string; label: string }[]
+  placeholder?: string
   className?: string
+  triggerClassName?: string
 }
 
-export function FilterSelect({ label, value, onChange, options, className }: FilterSelectProps) {
+export function FilterSelect({
+  label,
+  value,
+  onChange,
+  options,
+  placeholder,
+  className,
+  triggerClassName,
+}: FilterSelectProps) {
   return (
     <label className={cn('flex items-center gap-1.5', className)}>
       <span className="text-label">{label}</span>
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="h-8 w-[150px] bg-surface text-sm">
-          <SelectValue />
+        <SelectTrigger className={cn('h-8 w-[150px] bg-surface text-sm', triggerClassName)}>
+          <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>
           {options.map((option) => (

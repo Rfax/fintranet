@@ -41,7 +41,12 @@ export function RefundsPage() {
 
   const columns = useMemo<Column<RefundRequest>[]>(
     () => [
-      { id: 'id', header: 'Refund', className: 'font-mono text-xs', cell: (row) => row.id },
+      {
+        id: 'id',
+        header: 'Refund',
+        className: 'whitespace-nowrap font-mono text-xs',
+        cell: (row) => row.id,
+      },
       {
         id: 'customer',
         header: 'Customer',

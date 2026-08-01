@@ -45,7 +45,7 @@ export function KycOverviewPage() {
       {
         id: 'id',
         header: 'Case',
-        className: 'font-mono text-xs',
+        className: 'whitespace-nowrap font-mono text-xs',
         cell: (row) => row.id,
       },
       {
@@ -90,6 +90,7 @@ export function KycOverviewPage() {
       {
         id: 'sla',
         header: 'Age / SLA',
+        className: 'whitespace-nowrap',
         cell: (row) => {
           const state = slaState(row.slaDueAt)
           return (
