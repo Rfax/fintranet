@@ -1,6 +1,6 @@
 /**
  * Fixture timestamps are generated relative to load time so the synthetic
- * queues always look recent regardless of when the prototype is opened.
+ * queues always look recent regardless of when the console is opened.
  */
 const MINUTE = 60 * 1000
 const HOUR = 60 * MINUTE

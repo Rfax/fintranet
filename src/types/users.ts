@@ -5,7 +5,6 @@ export interface AppUser {
   name: string
   email: string
   team: string
-  /** The role the prototype simulates for this user. Not real authorization. */
   role: Role
   avatarInitials: string
 }
@@ -18,6 +17,7 @@ export type ActivityAction =
   | 'case.info_requested'
   | 'case.assigned'
   | 'case.note_added'
+  | 'refund.retried'
   | 'refund.approved'
   | 'refund.rejected'
   | 'refund.escalated'
@@ -28,6 +28,7 @@ export type ActivityAction =
   | 'flag.targeting_changed'
   | 'flag.override_set'
   | 'flag.override_cleared'
+  | 'flag.rolled_back'
 
 export interface ActivityChange {
   field: string
@@ -35,10 +36,6 @@ export interface ActivityChange {
   after: string
 }
 
-/**
- * Prototype activity history. Presented as a timeline, not as a
- * tamper-resistant or compliance-grade audit log.
- */
 export interface ActivityEvent {
   id: string
   module: ActivityModule

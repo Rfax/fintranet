@@ -13,7 +13,7 @@ export function NotFoundPage() {
         <Panel>
           <EmptyState
             icon={Compass}
-            title="This route does not exist in the prototype"
+            title="This page does not exist"
             description="Use the module navigation to return to KYC review, refunds, feature flags, or the shared activity history."
             action={
               <Button asChild size="sm">

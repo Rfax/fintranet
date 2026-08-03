@@ -1,6 +1,6 @@
 import type { AppUser } from '@/types'
 
-/** Synthetic staff directory. No real people, no real authorization. */
+/** Operations staff directory. */
 export const appUsers: AppUser[] = [
   {
     id: 'usr_dana',
@@ -44,7 +44,7 @@ export const appUsers: AppUser[] = [
   },
 ]
 
-/** The mock signed-in user for the prototype session. */
+/** The currently signed-in operator. */
 export const signedInUserId = 'usr_dana'
 
 export function findUser(userId: string | null | undefined): AppUser | undefined {

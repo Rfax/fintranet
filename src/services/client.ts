@@ -1,13 +1,13 @@
 /**
- * Thin transport shim between the UI and the synthetic fixtures.
+ * Thin transport shim between the UI and the data layer.
  *
- * Every service function is promise-based so the fixture reads can later be
- * swapped for real internal API calls without touching the components.
+ * Every service function is promise-based so the local implementation can
+ * later be swapped for internal API calls without touching the components.
  */
 
-const DEFAULT_LATENCY_MS = 140
+const DEFAULT_LATENCY_MS = 120
 
-export type ServiceErrorCode = 'not_found' | 'forbidden' | 'unavailable'
+export type ServiceErrorCode = 'not_found' | 'forbidden' | 'conflict' | 'unavailable'
 
 export class ServiceError extends Error {
   readonly code: ServiceErrorCode
@@ -19,7 +19,7 @@ export class ServiceError extends Error {
   }
 }
 
-/** Resolves after a small delay so loading states are exercised realistically. */
+/** Resolves after a small delay so loading states behave like real requests. */
 export function respond<T>(value: T, latencyMs = DEFAULT_LATENCY_MS): Promise<T> {
   return new Promise((resolve) => {
     setTimeout(() => resolve(structuredClone(value)), latencyMs)
@@ -49,7 +49,7 @@ export function writeStored<T>(key: string, value: T): void {
   try {
     window.localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(value))
   } catch {
-    /* Persistence is a convenience in the prototype; ignore quota errors. */
+    /* Storage is a convenience here; ignore quota and privacy-mode errors. */
   }
 }
 

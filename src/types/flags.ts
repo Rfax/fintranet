@@ -45,6 +45,12 @@ export interface EnvironmentConfig {
   rolloutPercentage: number
   updatedAt: ISODateString
   updatedById: string
+  /** Retained so a change can be rolled back in one step. */
+  previous?: {
+    enabled: boolean
+    rolloutPercentage: number
+    changedAt: ISODateString
+  }
 }
 
 export interface CodeLocation {
@@ -62,6 +68,10 @@ export interface CodeLocation {
   highlightLine: number
   lastModifiedAt: ISODateString
   lastModifiedBy: string
+  /** Set on test references that exercise the flag-disabled path. */
+  coversDisabledPath?: boolean
+  /** Reference that looks safe to delete once the flag is retired. */
+  cleanupCandidate?: boolean
 }
 
 export interface FlagDependency {
@@ -122,7 +132,6 @@ export interface EvaluationStep {
   matched: boolean
 }
 
-/** Simulated evaluation. Production would reuse the runtime SDK semantics. */
 export interface FlagEvaluation {
   flagKey: string
   flagName: string
@@ -133,7 +142,7 @@ export interface FlagEvaluation {
   steps: EvaluationStep[]
 }
 
-export interface SyntheticFlagUser {
+export interface FlagUser {
   id: string
   name: string
   email: string
@@ -147,5 +156,15 @@ export interface FlagListFilters {
   environment?: EnvironmentKey
   enabled?: boolean
   ownerTeam?: string
+  lifecycle?: FlagLifecycle
   staleOnly?: boolean
+}
+
+/** Users a proposed targeting or rollout change would newly affect. */
+export interface AudiencePreview {
+  matchedUsers: FlagUser[]
+  matchedCount: number
+  totalUsers: number
+  estimatedAudience: number
+  sharePct: number
 }

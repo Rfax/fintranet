@@ -1,6 +1,4 @@
-/**
- * Shared vocabulary for every module. All values are synthetic prototype data.
- */
+/** Shared vocabulary for every module. */
 
 export type RiskLevel = 'low' | 'medium' | 'high' | 'critical'
 
@@ -12,7 +10,7 @@ export type Role = 'viewer' | 'operator' | 'admin'
 
 export type ISODateString = string
 
-/** Money is stored in minor units to avoid floating point drift in the prototype. */
+/** Money is stored in minor units to avoid floating point drift. */
 export interface Money {
   amountMinor: number
   currency: 'USD' | 'EUR' | 'GBP'

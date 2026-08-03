@@ -100,6 +100,59 @@ export interface KycLinkedIdentity {
   priorReviewOutcome?: string
 }
 
+/** One field compared across two sources, used by the evidence panels. */
+export interface FieldComparison {
+  field: string
+  left: string
+  right: string
+  agrees: boolean
+}
+
+export interface SanctionsMatchDetail {
+  listName: string
+  entryName: string
+  entryAliases: string[]
+  nameMatchStrength: number
+  screenedAt: ISODateString
+  comparisons: FieldComparison[]
+  entryNotes: string
+}
+
+export interface DocumentComparisonDetail {
+  documentId: string
+  documentType: string
+  extractionConfidence: number
+  documentValidUntil?: ISODateString
+  comparisons: FieldComparison[]
+  anomalies: string[]
+}
+
+export interface JurisdictionDetail {
+  policyId: string
+  policyName: string
+  policyStatement: string
+  connections: {
+    country: string
+    connection: string
+    source: string
+    tier: 'enhanced_diligence' | 'monitored' | 'standard'
+  }[]
+  strengthening: string[]
+  weakening: string[]
+}
+
+export interface AddressVerificationDetail {
+  provider: string
+  checkedAt: ISODateString
+  submitted: string
+  normalized: string
+  verified: string
+  mismatchedComponents: string[]
+  providerResponse: string
+  evidenceSource: string
+  evidenceDate: ISODateString
+}
+
 export interface KycCase {
   id: string
   customerId: string
@@ -120,6 +173,13 @@ export interface KycCase {
   documents: KycDocument[]
   linkedIdentities: KycLinkedIdentity[]
   notes: KycNote[]
+  /** Structured evidence for the panel that matches the leading signal. */
+  sanctionsMatch?: SanctionsMatchDetail
+  documentComparison?: DocumentComparisonDetail
+  jurisdiction?: JurisdictionDetail
+  addressVerification?: AddressVerificationDetail
+  decisionReason?: string
+  decidedById?: string
 }
 
 export interface KycQueueFilters {
@@ -127,6 +187,7 @@ export interface KycQueueFilters {
   status?: KycCaseStatus[]
   risk?: RiskLevel[]
   assigneeId?: string | 'me' | null
+  overdueOnly?: boolean
   sort?: 'oldest' | 'newest' | 'highest_risk' | 'sla'
 }
 
@@ -138,7 +199,11 @@ export interface KycWorkloadMetrics {
   averageReviewMinutes: number
   previousAverageReviewMinutes: number
   oldestUnreviewedCaseId: string | null
+  oldestUnreviewedSubmittedAt: ISODateString | null
   backlogByRisk: Record<RiskLevel, number>
+  backlogBySla: { onTrack: number; dueSoon: number; breached: number }
+  /** Days to clear the backlog at the recent completion rate, if positive. */
+  estimatedDaysToClear: number | null
   trend: KycTrendPoint[]
 }
 

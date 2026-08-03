@@ -15,7 +15,6 @@ interface CodeSnippetPanelProps {
   snippet: string
   /** 1-based line inside the snippet to highlight. */
   highlightLine?: number
-  /** Simulated hand-off; no real repository or Devin integration exists. */
   onOpenInDevin?: () => void
   className?: string
 }

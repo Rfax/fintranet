@@ -1,22 +1,99 @@
-import { useParams } from 'react-router'
-import { AlertTriangle, FileText, Users } from 'lucide-react'
+import { useCallback, useState } from 'react'
+import { useNavigate, useParams } from 'react-router'
+import { AlertTriangle, ArrowRight, FileText, Users } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { RiskBadge, StatusBadge } from '@/components/shared/Badges'
+import { Textarea } from '@/components/ui/textarea'
+import { Pill, RiskBadge, SlaBadge, StatusBadge } from '@/components/shared/Badges'
+import { ActivityTimeline } from '@/components/shared/ActivityTimeline'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { ExpandableSection } from '@/components/shared/ExpandableSection'
 import { PageBody, PageHeader } from '@/components/shared/PageHeader'
 import { DetailList, Panel } from '@/components/shared/Panel'
-import { ScaffoldNotice } from '@/components/shared/ScaffoldNotice'
+import { EvidencePanel } from '@/components/kyc/EvidencePanel'
 import { findUser } from '@/data/users'
 import { useAsyncData } from '@/hooks/useAsyncData'
+import { toQueueFilters, useKycQueueFilters } from '@/hooks/useKycQueueFilters'
+import { useSession } from '@/hooks/useSession'
 import { explainFocusSelection, kycFocusLabel, rankSignals } from '@/logic/focus'
-import { formatMoney, formatRelativeTime, titleCase } from '@/logic/format'
-import { getKycCase } from '@/services/kycService'
+import {
+  formatDate,
+  formatDuration,
+  formatMoney,
+  formatPercent,
+  formatRelativeTime,
+  slaState,
+  titleCase,
+} from '@/logic/format'
+import { listActivity } from '@/services/activityService'
+import {
+  addKycNote,
+  assignKycCase,
+  decideKycCase,
+  getKycCase,
+  getNextCaseId,
+  type KycDecision,
+} from '@/services/kycService'
+
+const decisionCopy: Record<
+  KycDecision,
+  { title: string; confirmLabel: string; description: string; destructive: boolean }
+> = {
+  approve: {
+    title: 'Approve this case',
+    confirmLabel: 'Approve case',
+    description:
+      'Approving closes the review and releases the customer for onboarding. A reason is optional but recorded.',
+    destructive: false,
+  },
+  reject: {
+    title: 'Reject this case',
+    confirmLabel: 'Reject case',
+    description:
+      'Rejecting closes the review and blocks onboarding. The reason is recorded in the activity history.',
+    destructive: true,
+  },
+  request_info: {
+    title: 'Request more information',
+    confirmLabel: 'Request information',
+    description:
+      'The case moves to "info requested" and stays in the queue. Describe exactly what the customer must provide.',
+    destructive: false,
+  },
+}
 
 export function KycCaseDetailPage() {
   const { caseId = '' } = useParams()
-  const { data: kycCase, loading, error } = useAsyncData(() => getKycCase(caseId), [caseId])
+  const navigate = useNavigate()
+  const { user } = useSession()
+  const [decision, setDecision] = useState<KycDecision | null>(null)
+  const [noteDraft, setNoteDraft] = useState('')
+  const [savingNote, setSavingNote] = useState(false)
+  const [queueFilters] = useKycQueueFilters()
+
+  const {
+    data: kycCase,
+    loading,
+    error,
+    reload,
+  } = useAsyncData(() => getKycCase(caseId), [caseId])
+  const activity = useAsyncData(
+    () => listActivity({ module: 'kyc', recordId: kycCase?.id ?? caseId }),
+    [kycCase?.id, caseId],
+  )
+
+  const refresh = useCallback(() => {
+    reload()
+    activity.reload()
+  }, [reload, activity])
+
+  const openNextCase = useCallback(async () => {
+    const nextId = await getNextCaseId(caseId, toQueueFilters(queueFilters))
+    if (nextId) navigate(`/kyc/${nextId}`)
+    else toast.info('No further cases match the current queue filters')
+  }, [caseId, navigate, queueFilters])
 
   if (loading) {
     return (
@@ -34,7 +111,7 @@ export function KycCaseDetailPage() {
           <EmptyState
             icon={AlertTriangle}
             title="Case not found"
-            description={error?.message ?? `No synthetic case matches ${caseId}.`}
+            description={error?.message ?? `No case matches ${caseId}.`}
           />
         </Panel>
       </PageBody>
@@ -44,98 +121,207 @@ export function KycCaseDetailPage() {
   const ranked = rankSignals(kycCase.riskSignals)
   const primary = ranked[0]
   const secondary = ranked.slice(1)
-  const passedChecks = kycCase.verificationResults.filter((result) => result.outcome === 'passed').length
+  const passedChecks = kycCase.verificationResults.filter(
+    (result) => result.outcome === 'passed',
+  ).length
+  const decided = kycCase.status === 'approved' || kycCase.status === 'rejected'
+  const sla = slaState(kycCase.slaDueAt)
+  const summary = kycCase.transactionSummary
+  const assignee = findUser(kycCase.assigneeId)
+
+  const submitDecision = async (reason: string) => {
+    if (!decision) return
+    try {
+      await decideKycCase(kycCase.id, decision, reason, user.id)
+      toast.success(
+        decision === 'approve'
+          ? `${kycCase.id} approved`
+          : decision === 'reject'
+            ? `${kycCase.id} rejected`
+            : `Information requested on ${kycCase.id}`,
+      )
+      refresh()
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : 'The decision could not be recorded')
+    } finally {
+      setDecision(null)
+    }
+  }
+
+  const submitNote = async () => {
+    setSavingNote(true)
+    try {
+      await addKycNote(kycCase.id, noteDraft, user.id)
+      setNoteDraft('')
+      toast.success('Note added to the case')
+      refresh()
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : 'The note could not be saved')
+    } finally {
+      setSavingNote(false)
+    }
+  }
+
+  const takeCase = async () => {
+    try {
+      await assignKycCase(kycCase.id, user.id, user.id)
+      toast.success(`${kycCase.id} assigned to you`)
+      refresh()
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : 'The case could not be assigned')
+    }
+  }
 
   return (
     <>
       <PageHeader
         title={kycCase.customerName}
-        breadcrumbs={[
-          { label: 'KYC Review', to: '/kyc' },
-          { label: kycCase.id },
-        ]}
+        breadcrumbs={[{ label: 'KYC Review', to: '/kyc' }, { label: kycCase.id }]}
         meta={
           <>
             <span className="font-mono text-xs text-muted-foreground">{kycCase.id}</span>
             <RiskBadge level={kycCase.overallRisk} />
             <StatusBadge status={kycCase.status} />
+            <SlaBadge
+              state={sla}
+              label={
+                sla === 'breached'
+                  ? `Overdue ${formatDuration(Date.now() - Date.parse(kycCase.slaDueAt))}`
+                  : `Due ${formatRelativeTime(kycCase.slaDueAt)}`
+              }
+            />
           </>
         }
         description={`Submitted ${formatRelativeTime(kycCase.submittedAt)} · ${
-          findUser(kycCase.assigneeId)?.name ?? 'Unassigned'
+          assignee?.name ?? 'Unassigned'
         } · ${kycCase.country}`}
         actions={
-          <>
-            <Button variant="outline" size="sm" disabled>
-              Request info
-            </Button>
-            <Button variant="outline" size="sm" disabled>
-              Reject
-            </Button>
-            <Button size="sm" disabled>
-              Approve
-            </Button>
-          </>
+          decided ? (
+            <>
+              <span className="text-xs text-muted-foreground">
+                Decided {kycCase.completedAt ? formatRelativeTime(kycCase.completedAt) : ''} by{' '}
+                {findUser(kycCase.decidedById ?? null)?.name ?? 'an operator'}
+              </span>
+              <Button variant="outline" size="sm" onClick={openNextCase}>
+                Next case
+                <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+              </Button>
+            </>
+          ) : (
+            <>
+              {kycCase.assigneeId === user.id ? null : (
+                <Button variant="ghost" size="sm" onClick={takeCase}>
+                  Assign to me
+                </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={() => setDecision('request_info')}>
+                Request info
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setDecision('reject')}>
+                Reject
+              </Button>
+              <Button size="sm" onClick={() => setDecision('approve')}>
+                Approve
+              </Button>
+              <Button variant="ghost" size="sm" onClick={openNextCase}>
+                Next case
+                <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+              </Button>
+            </>
+          )
         }
       />
       <PageBody>
+        {decided && kycCase.decisionReason ? (
+          <div className="rounded-md border border-navy-200 bg-navy-50/60 px-3.5 py-2.5 text-sm text-navy-900">
+            <span className="font-medium">{titleCase(kycCase.status)}:</span>{' '}
+            {kycCase.decisionReason}
+          </div>
+        ) : null}
+
         {primary ? (
-          <Panel
-            emphasis="primary"
-            title={
-              <span className="flex flex-wrap items-center gap-2">
-                <span className="text-label">Primary review focus</span>
-                <span className="text-base font-semibold text-foreground">
-                  {kycFocusLabel(primary.type)}
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+            <EvidencePanel kycCase={kycCase} signal={primary} />
+            <Panel
+              title={
+                <span className="flex flex-col">
+                  <span className="text-label">Primary review focus</span>
+                  <span className="text-base font-semibold text-foreground">
+                    {kycFocusLabel(primary.type)}
+                  </span>
                 </span>
-              </span>
-            }
-            description={primary.headline}
-            actions={
-              <span className="text-xs text-muted-foreground">
-                {primary.confidence !== undefined
-                  ? `Confidence ${(primary.confidence * 100).toFixed(0)}%`
-                  : 'Confidence not reported'}
-              </span>
-            }
-            footer={`Why this is first: ${explainFocusSelection(kycCase.riskSignals)} Source: ${primary.source}.`}
-          >
-            <p className="text-sm text-foreground">{primary.explanation}</p>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-              {primary.evidence.map((item) => (
-                <div
-                  key={`${item.label}-${item.value}`}
-                  className={
-                    item.conflicting
-                      ? 'rounded border border-rose-200 bg-rose-50/70 px-2.5 py-1.5'
-                      : 'rounded border bg-surface-muted/60 px-2.5 py-1.5'
-                  }
-                >
-                  <p className="text-label">{item.label}</p>
-                  <p className="mt-0.5 truncate text-sm text-foreground">{item.value}</p>
-                </div>
-              ))}
-            </div>
-          </Panel>
+              }
+              actions={
+                <Pill tone={primary.severity === 'low' ? 'neutral' : 'warning'}>
+                  {primary.confidence !== undefined
+                    ? `Confidence ${(primary.confidence * 100).toFixed(0)}%`
+                    : 'Confidence not reported'}
+                </Pill>
+              }
+              footer={`Why this is first: ${explainFocusSelection(kycCase.riskSignals)} Source: ${primary.source}.`}
+              bodyClassName="space-y-3 px-4 py-3"
+            >
+              <p className="text-sm font-medium text-foreground">{primary.headline}</p>
+              <p className="text-sm text-muted-foreground">{primary.explanation}</p>
+              <div className="space-y-1.5 border-t pt-3">
+                <p className="text-label">Suggested evidence</p>
+                {primary.evidence.map((item) => (
+                  <div
+                    key={`${item.label}-${item.value}`}
+                    className={
+                      item.conflicting
+                        ? 'rounded border border-rose-200 bg-rose-50/70 px-2.5 py-1.5'
+                        : 'rounded border bg-surface-muted/60 px-2.5 py-1.5'
+                    }
+                  >
+                    <p className="text-label">{item.label}</p>
+                    <p className="mt-0.5 text-sm text-foreground">{item.value}</p>
+                  </div>
+                ))}
+              </div>
+            </Panel>
+          </div>
         ) : null}
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-          <Panel title="Customer financial picture" description="Declared profile compared with observed activity.">
+          <Panel
+            title="Customer financial picture"
+            description="Declared profile compared with observed activity."
+          >
             <DetailList
               columns={3}
               items={[
-                { label: 'Declared income', value: formatMoney(kycCase.profile.declaredAnnualIncome) },
-                { label: 'Monthly inflow', value: formatMoney(kycCase.transactionSummary.monthlyInflow), emphasis: true },
-                { label: 'Monthly outflow', value: formatMoney(kycCase.transactionSummary.monthlyOutflow) },
+                {
+                  label: 'Declared income',
+                  value: formatMoney(kycCase.profile.declaredAnnualIncome),
+                },
+                {
+                  label: 'Monthly inflow',
+                  value: formatMoney(summary.monthlyInflow),
+                  emphasis: true,
+                },
+                { label: 'Monthly outflow', value: formatMoney(summary.monthlyOutflow) },
+                { label: 'Transactions / month', value: summary.monthlyTransactionCount },
+                { label: 'Largest transfer', value: formatMoney(summary.largestSingleTransfer) },
+                {
+                  label: 'Cash / crypto share',
+                  value: `${formatPercent(summary.cashSharePct)} / ${formatPercent(summary.cryptoSharePct)}`,
+                },
                 { label: 'Occupation', value: kycCase.profile.occupation },
                 { label: 'Source of funds', value: kycCase.profile.sourceOfFunds },
-                { label: 'Primary geographies', value: kycCase.transactionSummary.primaryGeographies.join(', ') },
+                {
+                  label: 'Primary geographies',
+                  value: summary.primaryGeographies.join(', '),
+                },
               ]}
             />
             <ul className="mt-3 space-y-1.5 border-t pt-3">
-              {kycCase.transactionSummary.observations.map((observation) => (
+              {summary.observations.map((observation) => (
                 <li key={observation} className="flex gap-2 text-sm text-foreground">
-                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" aria-hidden />
+                  <AlertTriangle
+                    className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600"
+                    aria-hidden
+                  />
                   {observation}
                 </li>
               ))}
@@ -169,17 +355,105 @@ export function KycCaseDetailPage() {
 
         <div className="grid gap-3 lg:grid-cols-2">
           <ExpandableSection
+            title="Customer profile"
+            summary={`${kycCase.profile.nationality} · customer since ${formatDate(kycCase.profile.customerSince)}`}
+          >
+            <DetailList
+              columns={2}
+              items={[
+                { label: 'Full name', value: kycCase.profile.fullName },
+                { label: 'Date of birth', value: kycCase.profile.dateOfBirth },
+                { label: 'Nationality', value: kycCase.profile.nationality },
+                { label: 'Residence', value: kycCase.profile.residenceCountry },
+                { label: 'Address', value: kycCase.profile.addressLine },
+                { label: 'Email', value: kycCase.profile.email },
+                { label: 'Phone', value: kycCase.profile.phone },
+                { label: 'Customer since', value: formatDate(kycCase.profile.customerSince) },
+              ]}
+            />
+          </ExpandableSection>
+
+          <ExpandableSection
+            title="Accounts and balances"
+            summary={`${kycCase.accounts.length} accounts`}
+          >
+            <ul className="divide-y">
+              {kycCase.accounts.map((account) => (
+                <li
+                  key={account.id}
+                  className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0"
+                >
+                  <span className="min-w-0 truncate text-sm text-foreground">
+                    {titleCase(account.product)}{' '}
+                    <span className="font-mono text-xs text-muted-foreground">{account.id}</span>
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      opened {formatDate(account.openedAt)}
+                    </span>
+                  </span>
+                  <span className="flex shrink-0 items-center gap-2">
+                    <Pill tone={account.status === 'active' ? 'neutral' : 'danger'}>
+                      {titleCase(account.status)}
+                    </Pill>
+                    <span className="text-sm tabular-nums text-foreground">
+                      {formatMoney(account.balance)}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </ExpandableSection>
+
+          <ExpandableSection
+            title="Counterparties and geographic exposure"
+            summary={`${kycCase.counterparties.filter((entry) => entry.flagged).length} flagged of ${kycCase.counterparties.length}`}
+            emphasis={primary?.type === 'high_risk_jurisdiction'}
+          >
+            <ul className="divide-y">
+              {kycCase.counterparties.map((counterparty) => (
+                <li
+                  key={`${counterparty.name}-${counterparty.country}`}
+                  className="flex items-start justify-between gap-3 py-2 first:pt-0 last:pb-0"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm text-foreground">
+                      {counterparty.name}{' '}
+                      <span className="font-mono text-xs text-muted-foreground">
+                        {counterparty.country}
+                      </span>
+                    </p>
+                    <p className="text-xs text-muted-foreground">{counterparty.relationship}</p>
+                  </div>
+                  <span className="flex shrink-0 items-center gap-2">
+                    {counterparty.flagged ? <Pill tone="critical">Flagged</Pill> : null}
+                    <span className="text-sm tabular-nums text-foreground">
+                      {formatMoney(counterparty.volume, { compact: true })}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </ExpandableSection>
+
+          <ExpandableSection
             title="Verification results"
             summary={`${passedChecks} of ${kycCase.verificationResults.length} checks passed`}
           >
             <ul className="divide-y">
               {kycCase.verificationResults.map((result) => (
-                <li key={result.check} className="flex items-start justify-between gap-3 py-2 first:pt-0 last:pb-0">
+                <li
+                  key={result.check}
+                  className="flex items-start justify-between gap-3 py-2 first:pt-0 last:pb-0"
+                >
                   <div className="min-w-0">
                     <p className="text-sm text-foreground">{result.check}</p>
-                    <p className="text-xs text-muted-foreground">{result.detail}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {result.detail} · {result.provider} ·{' '}
+                      {formatRelativeTime(result.checkedAt)}
+                    </p>
                   </div>
-                  <StatusBadge status={result.outcome === 'passed' ? 'approved' : result.outcome} />
+                  <StatusBadge
+                    status={result.outcome === 'passed' ? 'approved' : result.outcome}
+                  />
                 </li>
               ))}
             </ul>
@@ -188,14 +462,19 @@ export function KycCaseDetailPage() {
           <ExpandableSection
             title="Documents"
             summary={`${kycCase.documents.length} submitted`}
+            emphasis={primary?.type === 'document_mismatch'}
           >
             <ul className="divide-y">
               {kycCase.documents.map((document) => (
                 <li key={document.id} className="flex items-start gap-2 py-2 first:pt-0 last:pb-0">
-                  <FileText className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                  <FileText
+                    className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground"
+                    aria-hidden
+                  />
                   <div className="min-w-0">
                     <p className="truncate text-sm text-foreground">
-                      {titleCase(document.type)} · <span className="font-mono text-xs">{document.fileName}</span>
+                      {titleCase(document.type)} ·{' '}
+                      <span className="font-mono text-xs">{document.fileName}</span>
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {document.anomalies.length > 0
@@ -209,30 +488,40 @@ export function KycCaseDetailPage() {
           </ExpandableSection>
 
           <ExpandableSection
-            title="Linked identities"
+            title="Linked identities and devices"
             summary={
               kycCase.linkedIdentities.length === 0
                 ? 'No related records'
                 : `${kycCase.linkedIdentities.length} possible matches`
             }
             emphasis={primary?.type === 'duplicate_identity'}
-            defaultOpen={primary?.type === 'duplicate_identity'}
           >
             {kycCase.linkedIdentities.length === 0 ? (
-              <p className="text-sm text-muted-foreground">The identity graph returned no related records.</p>
+              <p className="text-sm text-muted-foreground">
+                The identity graph returned no related records.
+              </p>
             ) : (
               <ul className="space-y-2">
                 {kycCase.linkedIdentities.map((identity) => (
-                  <li key={identity.customerId} className="flex items-start gap-2 rounded border bg-surface-muted/50 px-3 py-2">
-                    <Users className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                  <li
+                    key={identity.customerId}
+                    className="flex items-start gap-2 rounded border bg-surface-muted/50 px-3 py-2"
+                  >
+                    <Users
+                      className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground"
+                      aria-hidden
+                    />
                     <div className="min-w-0">
                       <p className="text-sm text-foreground">
                         {identity.customerName}{' '}
-                        <span className="font-mono text-xs text-muted-foreground">{identity.customerId}</span>
+                        <span className="font-mono text-xs text-muted-foreground">
+                          {identity.customerId}
+                        </span>
                       </p>
                       <p className="text-xs text-muted-foreground">
                         Shares {identity.sharedAttributes.join(', ')} · match strength{' '}
-                        {(identity.matchStrength * 100).toFixed(0)}% · account {identity.accountStatus}
+                        {(identity.matchStrength * 100).toFixed(0)}% · account{' '}
+                        {identity.accountStatus}
                       </p>
                     </div>
                   </li>
@@ -240,37 +529,81 @@ export function KycCaseDetailPage() {
               </ul>
             )}
           </ExpandableSection>
-
-          <ExpandableSection title="Accounts and balances" summary={`${kycCase.accounts.length} accounts`}>
-            <ul className="divide-y">
-              {kycCase.accounts.map((account) => (
-                <li key={account.id} className="flex items-center justify-between py-2 first:pt-0 last:pb-0">
-                  <span className="text-sm text-foreground">
-                    {titleCase(account.product)}{' '}
-                    <span className="font-mono text-xs text-muted-foreground">{account.id}</span>
-                  </span>
-                  <span className="text-sm tabular-nums text-foreground">{formatMoney(account.balance)}</span>
-                </li>
-              ))}
-            </ul>
-          </ExpandableSection>
         </div>
 
-        <ScaffoldNotice
-          planned={[
-            'Type-specific focus panels for sanctions, document mismatch, jurisdiction, duplicates, and address failures',
-            'Side-by-side evidence comparison with matching and conflicting fields called out',
-            'Approve, reject, request-information, and note actions with required reasons and confirmation',
-            'Notes, review history, and per-case activity timeline',
-            'Next-case navigation that respects the current queue filter',
-          ]}
-          available={[
-            'Deterministic focus selection with an explanation of why the signal ranked first',
-            'Financial picture summarised before the evidence sections',
-            'Progressive disclosure sections with compact collapsed summaries',
-          ]}
-        />
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Panel title="Notes" description="Visible to every reviewer on this case.">
+            <div className="space-y-2">
+              <Textarea
+                value={noteDraft}
+                onChange={(event) => setNoteDraft(event.target.value)}
+                placeholder="Record what you checked, what you found, and what remains open."
+                className="min-h-[72px] text-sm"
+              />
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  disabled={noteDraft.trim().length === 0 || savingNote}
+                  onClick={submitNote}
+                >
+                  Add note
+                </Button>
+              </div>
+            </div>
+            {kycCase.notes.length === 0 ? (
+              <p className="mt-3 border-t pt-3 text-sm text-muted-foreground">
+                No notes on this case yet.
+              </p>
+            ) : (
+              <ul className="mt-3 space-y-2.5 border-t pt-3">
+                {kycCase.notes.map((note) => (
+                  <li key={note.id}>
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="text-sm font-medium text-foreground">{note.authorName}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {formatRelativeTime(note.createdAt)}
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{note.body}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Panel>
+
+          <Panel title="Case activity" description="Every decision and note recorded for this case.">
+            <ActivityTimeline events={activity.data ?? []} showRecordLink={false} />
+          </Panel>
+        </div>
       </PageBody>
+
+      {decision ? (
+        <ConfirmDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setDecision(null)
+          }}
+          title={decisionCopy[decision].title}
+          description={decisionCopy[decision].description}
+          confirmLabel={decisionCopy[decision].confirmLabel}
+          destructive={decisionCopy[decision].destructive}
+          requireReason={decision !== 'approve'}
+          details={
+            <div className="rounded border bg-surface-muted/60 px-3 py-2 text-sm">
+              <p className="font-medium text-foreground">
+                {kycCase.customerName}{' '}
+                <span className="font-mono text-xs text-muted-foreground">{kycCase.id}</span>
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {kycCase.overallRisk} risk ·{' '}
+                {primary ? kycFocusLabel(primary.type) : 'No dominant signal'} ·{' '}
+                {passedChecks} of {kycCase.verificationResults.length} checks passed
+              </p>
+            </div>
+          }
+          onConfirm={submitDecision}
+        />
+      ) : null}
     </>
   )
 }

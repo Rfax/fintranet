@@ -34,13 +34,12 @@ interface ActivityTimelineProps {
   className?: string
 }
 
-/** Prototype activity history. Not an immutable or compliance-grade audit log. */
 export function ActivityTimeline({ events, showRecordLink = true, className }: ActivityTimelineProps) {
   if (events.length === 0) {
     return (
       <EmptyState
         title="No activity yet"
-        description="Actions taken in this prototype appear here with actor, reason, and before/after values."
+        description="Decisions and configuration changes appear here with actor, reason, and before/after values."
       />
     )
   }

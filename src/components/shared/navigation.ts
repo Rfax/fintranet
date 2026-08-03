@@ -19,14 +19,17 @@ export const navItems: NavItem[] = [
     label: 'Refunds',
     to: '/refunds',
     icon: ReceiptText,
-    description: 'Refund dashboard, queue, and behavioural context',
+    description: 'Refund dashboard, queue, and behavioral context',
   },
   {
     label: 'Feature Flags',
     to: '/flags',
     icon: ToggleRight,
     description: 'Flag configuration, code usage, and effective values',
-    children: [{ label: 'Effective-flag debugger', to: '/flags/debugger' }],
+    children: [
+      { label: 'My flags', to: '/flags/my-flags' },
+      { label: 'Effective-flag debugger', to: '/flags/debugger' },
+    ],
   },
   {
     label: 'Activity',

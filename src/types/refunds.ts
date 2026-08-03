@@ -3,6 +3,7 @@ import type { AttentionSignal, ISODateString, Money, RiskLevel } from './common'
 export type RefundStatus =
   | 'pending_review'
   | 'awaiting_second_approval'
+  | 'escalated'
   | 'approved'
   | 'rejected'
   | 'processing'
@@ -104,13 +105,23 @@ export interface RefundRequest {
   }
   relatedRefundIds: string[]
   notes: RefundNote[]
+  escalation?: {
+    escalatedById: string
+    escalatedByName: string
+    escalatedAt: ISODateString
+    reason: string
+  }
+  decisionReason?: string
 }
+
+export type RefundAmountBand = 'under_100' | '100_to_1000' | '1000_to_2500' | 'over_2500'
 
 export interface RefundQueueFilters {
   search?: string
   status?: RefundStatus[]
   reason?: RefundReason[]
   risk?: RiskLevel[]
+  amountBand?: RefundAmountBand
   highValueOnly?: boolean
 }
 
@@ -121,4 +132,5 @@ export interface RefundMetrics {
   averageProcessingHours: number
   failureRatePct: number
   volumeTrend: { date: string; count: number; amountMinor: number }[]
+  reasonBreakdown: { reason: RefundReason; count: number; amountMinor: number }[]
 }

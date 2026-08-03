@@ -1,6 +1,6 @@
-# Fintranet — Operations Console (prototype)
+# Fintranet — Operations Console
 
-Fintranet is a prototype internal operations console covering three workflows that today live in
+Fintranet is an internal operations console covering three workflows that today live in
 separate Microsoft Power Apps: **KYC review**, **refund operations**, and **feature-flag
 administration**.
 
@@ -8,17 +8,16 @@ The product idea it demonstrates is **attention-aware presentation**: a record i
 generic form with every field weighted equally. Each case, refund, or flag is presented around the
 thing that actually needs a decision, with the complete underlying record still one click away.
 
-> **Prototype boundaries**
+> **Boundaries**
 >
-> - All data is synthetic TypeScript fixtures. No customer, payment, repository, or flag data is real.
-> - Authentication and authorization are simulated. The signed-in user, role switcher, and
->   environment switcher are UI state, not access control.
-> - Actions never affect real customers, payments, repositories, or feature flags.
-> - This demonstrates the **application layer** only. It is not a production replacement for
->   Dataverse, Power Automate, identity, governance, or compliance infrastructure. The activity
->   history is a prototype timeline, not a tamper-resistant audit log.
+> - Records come from TypeScript fixtures served through the service layer; no production system is
+>   connected. Actions mutate local state only.
+> - The signed-in user is fixed and there is no identity provider wired in.
+> - This is the **application layer** only — not a replacement for Dataverse, Power Automate,
+>   identity, governance, or compliance infrastructure. The activity history is an operational
+>   timeline, not a tamper-resistant audit log.
 
-`PROTOTYPE_FEATURES.md` is the source of truth for the product vision and planned feature set.
+`PROTOTYPE_FEATURES.md` is the source of truth for the product vision and feature set.
 
 ## Setup
 
@@ -48,7 +47,7 @@ src/
     shared/    shell, page chrome, and cross-module compositions
     kyc/ refunds/ flags/   module-specific presentation pieces
   pages/       one component per route
-  data/        synthetic fixtures
+  data/        fixture records served through the service layer
   services/    promise-based service layer over the fixtures
   logic/       pure domain logic (focus selection, formatting) with Vitest coverage
   types/       domain models
@@ -56,11 +55,11 @@ src/
 ```
 
 **Service layer.** Pages never import fixtures directly. `src/services/*` exposes async functions
-(`listKycCases`, `getRefund`, `listFlags`, …) that clone fixture data behind a small simulated
-latency, so loading and error states are real and the mock implementation can later be swapped for
-internal APIs without touching the interface. `localStorage` is used only where persistence is
-genuinely useful: simulated role, simulated environment, sidebar state, and activity recorded
-during a session.
+(`listKycCases`, `approveRefund`, `updateEnvironmentConfig`, …) behind a small latency, so loading
+and error states are real and the fixture implementation can later be swapped for internal APIs
+without touching the interface. Mutations are written back through `src/services/store.ts`, so
+decisions, refund approvals, and flag configuration survive a reload. `localStorage` also holds
+queue filters, the selected flag environment, and sidebar state.
 
 **Attention-aware presentation.** `src/logic/focus.ts` ranks the signals attached to a record
 (severity, then confidence, then detection time) and returns both the primary signal and a
@@ -68,9 +67,10 @@ human-readable explanation of why it ranked first. The same deterministic logic 
 focus column in every queue and the emphasised panel on every detail view, so presentation stays
 explainable and never changes the underlying record.
 
-**Session simulation.** `SessionProvider` holds the mock signed-in user, simulated role
-(viewer / operator / admin), and simulated environment (development / staging / production).
-`can()` in `sessionService` gates UI affordances only; there is no real authorization.
+**Flag evaluation.** `src/logic/flagEvaluation.ts` resolves a flag for a user in one place —
+environment default, global state, targeting rules, percentage rollout, then personal override — and
+both the flag detail page and the effective-flag debugger render that same trace, so an effective
+value shown anywhere in the console is produced identically.
 
 **Routes.** All routes render inside the shared shell (collapsible navigation, top bar, breadcrumbs):
 
@@ -81,16 +81,11 @@ explainable and never changes the underlying record.
 | `/kyc/:caseId` | Adaptive KYC case detail |
 | `/refunds` | Refund dashboard and queue |
 | `/refunds/:refundId` | Refund detail with customer and item context |
-| `/flags` | Feature-flag dashboard |
+| `/flags` | Feature-flag inventory |
 | `/flags/debugger` | Effective-flag debugger by user |
+| `/flags/my-flags` | Flags owned by the signed-in user |
 | `/flags/:flagKey` | Feature-flag detail with code references |
 | `/activity` | Shared activity history |
-
-## Current state
-
-This is the scaffolding slice: the shell, design language, types, fixtures, service layer, and
-focus-selection logic are in place, and every route renders real synthetic data. Views that are not
-yet built out end with a "Planned for this view" panel listing what the feature slice will add.
 
 ## Stack
 

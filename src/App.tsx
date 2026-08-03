@@ -24,8 +24,9 @@ export default function App() {
             <Route path="/refunds" element={<RefundsPage />} />
             <Route path="/refunds/:refundId" element={<RefundDetailPage />} />
             <Route path="/flags" element={<FlagsPage />} />
-            {/* Declared before /flags/:flagKey so the debugger is not read as a key. */}
+            {/* Declared before /flags/:flagKey so these are not read as keys. */}
             <Route path="/flags/debugger" element={<FlagDebuggerPage />} />
+            <Route path="/flags/my-flags" element={<FlagsPage mine />} />
             <Route path="/flags/:flagKey" element={<FlagDetailPage />} />
             <Route path="/activity" element={<ActivityPage />} />
             <Route path="*" element={<NotFoundPage />} />

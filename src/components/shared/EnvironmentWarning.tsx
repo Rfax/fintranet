@@ -1,16 +1,24 @@
-import { AlertTriangle, FlaskConical, ShieldCheck } from 'lucide-react'
+import { AlertTriangle, FlaskConical } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { formatNumber } from '@/logic/format'
 import type { EnvironmentKey } from '@/types'
 import { environmentMeta } from './environment-meta'
 
 interface EnvironmentWarningProps {
   environment: EnvironmentKey
+  /** Users in scope for the change, shown so the blast radius is explicit. */
+  audience?: number
   compact?: boolean
   className?: string
 }
 
-/** Shown wherever an action would reach production in a real deployment. */
-export function EnvironmentWarning({ environment, compact, className }: EnvironmentWarningProps) {
+/** Shown wherever a change would reach production traffic. */
+export function EnvironmentWarning({
+  environment,
+  audience,
+  compact,
+  className,
+}: EnvironmentWarningProps) {
   if (environment !== 'production') {
     return (
       <div
@@ -21,8 +29,8 @@ export function EnvironmentWarning({ environment, compact, className }: Environm
       >
         <FlaskConical className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
         <p>
-          Simulated <strong>{environmentMeta[environment].label.toLowerCase()}</strong> environment.
-          Changes here are treated as low risk in the prototype.
+          Editing the <strong>{environmentMeta[environment].label.toLowerCase()}</strong>{' '}
+          environment. Production configuration is unaffected.
         </p>
       </div>
     )
@@ -37,27 +45,9 @@ export function EnvironmentWarning({ environment, compact, className }: Environm
     >
       <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
       <p>
-        <strong>Production-scoped change.</strong> In a real deployment this would affect live
-        customers.{' '}
-        {compact ? null : 'In this prototype nothing outside the browser is modified.'}
-      </p>
-    </div>
-  )
-}
-
-/** Compact banner stating the prototype's boundaries. */
-export function PrototypeNotice({ className }: { className?: string }) {
-  return (
-    <div
-      className={cn(
-        'flex items-start gap-2 rounded border border-navy-200 bg-navy-50 px-3 py-2 text-xs text-navy-900',
-        className,
-      )}
-    >
-      <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-      <p>
-        All data is synthetic and authentication is simulated. Actions never affect real customers,
-        payments, repositories, or feature flags.
+        <strong>Production scope.</strong> Changes take effect for live traffic
+        {audience === undefined ? '' : ` across ${formatNumber(audience)} users in scope`}.
+        {compact ? null : ' Every change is recorded in the activity history.'}
       </p>
     </div>
   )

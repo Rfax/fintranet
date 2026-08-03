@@ -1,7 +1,7 @@
 import type { ActivityEvent } from '@/types'
 import { daysAgo, hoursAgo } from './time'
 
-/** Seed history. Actions taken in the prototype append to this list. */
+/** Seed history. Actions taken in the console append to this list. */
 export const activityEvents: ActivityEvent[] = [
   {
     id: 'ACT-5001',

@@ -1,42 +1,110 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { useNavigate } from 'react-router'
+import { RotateCcw } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { RiskBadge, StatusBadge } from '@/components/shared/Badges'
 import { DataTable, type Column } from '@/components/shared/DataTable'
 import { FilterBar, FilterSelect } from '@/components/shared/FilterBar'
 import { MetricCard, MetricRow } from '@/components/shared/MetricCard'
 import { PageBody, PageHeader } from '@/components/shared/PageHeader'
 import { Panel } from '@/components/shared/Panel'
-import { ScaffoldNotice } from '@/components/shared/ScaffoldNotice'
+import { ReasonBreakdown, VolumeChart } from '@/components/refunds/RefundCharts'
 import { RefundFocusCell } from '@/components/refunds/RefundFocusCell'
 import { useAsyncData } from '@/hooks/useAsyncData'
+import { useLocalStorageState } from '@/hooks/useLocalStorageState'
 import { selectPrimarySignal } from '@/logic/focus'
 import { formatMoney, formatPercent, formatRelativeTime, titleCase } from '@/logic/format'
 import { getRefundMetrics, isHighValue, listRefunds } from '@/services/refundService'
-import type { RefundRequest, RefundStatus } from '@/types'
+import type {
+  RefundAmountBand,
+  RefundReason,
+  RefundRequest,
+  RefundStatus,
+  RiskLevel,
+} from '@/types'
 
 const statusOptions = [
   { value: 'all', label: 'All statuses' },
   { value: 'pending_review', label: 'Pending review' },
   { value: 'awaiting_second_approval', label: 'Awaiting 2nd approval' },
+  { value: 'escalated', label: 'Escalated' },
+  { value: 'processing', label: 'Processing' },
   { value: 'completed', label: 'Completed' },
+  { value: 'rejected', label: 'Rejected' },
   { value: 'failed', label: 'Failed' },
 ]
 
+const reasonOptions = [
+  { value: 'all', label: 'All reasons' },
+  { value: 'item_not_received', label: 'Item not received' },
+  { value: 'item_not_as_described', label: 'Not as described' },
+  { value: 'duplicate_charge', label: 'Duplicate charge' },
+  { value: 'subscription_cancelled', label: 'Subscription cancelled' },
+  { value: 'fraudulent_charge', label: 'Fraudulent charge' },
+  { value: 'service_issue', label: 'Service issue' },
+]
+
+const amountOptions = [
+  { value: 'all', label: 'Any amount' },
+  { value: 'under_100', label: 'Under $100' },
+  { value: '100_to_1000', label: '$100 – $1,000' },
+  { value: '1000_to_2500', label: '$1,000 – $2,500' },
+  { value: 'over_2500', label: 'Over $2,500' },
+]
+
+const riskOptions = [
+  { value: 'all', label: 'All risk' },
+  { value: 'critical', label: 'Critical' },
+  { value: 'high', label: 'High' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'low', label: 'Low' },
+]
+
+interface StoredRefundFilters {
+  search: string
+  status: string
+  reason: string
+  amountBand: string
+  risk: string
+  highValueOnly: boolean
+}
+
+const defaultFilters: StoredRefundFilters = {
+  search: '',
+  status: 'all',
+  reason: 'all',
+  amountBand: 'all',
+  risk: 'all',
+  highValueOnly: false,
+}
+
 export function RefundsPage() {
   const navigate = useNavigate()
-  const [search, setSearch] = useState('')
-  const [status, setStatus] = useState('all')
-  const [highValueOnly, setHighValueOnly] = useState(false)
+  const [filters, setFilters] = useLocalStorageState<StoredRefundFilters>(
+    'refund-queue-filters',
+    defaultFilters,
+  )
 
   const metrics = useAsyncData(() => getRefundMetrics(), [])
   const queue = useAsyncData(
     () =>
       listRefunds({
-        search,
-        status: status === 'all' ? undefined : [status as RefundStatus],
-        highValueOnly,
+        search: filters.search,
+        status: filters.status === 'all' ? undefined : [filters.status as RefundStatus],
+        reason: filters.reason === 'all' ? undefined : [filters.reason as RefundReason],
+        risk: filters.risk === 'all' ? undefined : [filters.risk as RiskLevel],
+        amountBand:
+          filters.amountBand === 'all' ? undefined : (filters.amountBand as RefundAmountBand),
+        highValueOnly: filters.highValueOnly,
       }),
-    [search, status, highValueOnly],
+    [
+      filters.search,
+      filters.status,
+      filters.reason,
+      filters.risk,
+      filters.amountBand,
+      filters.highValueOnly,
+    ],
   )
 
   const columns = useMemo<Column<RefundRequest>[]>(
@@ -55,9 +123,13 @@ export function RefundsPage() {
       {
         id: 'amount',
         header: 'Amount',
-        className: 'tabular-nums',
+        className: 'whitespace-nowrap tabular-nums',
         cell: (row) => (
-          <span className={isHighValue(row.amount) ? 'font-semibold text-foreground' : 'text-foreground'}>
+          <span
+            className={
+              isHighValue(row.amount) ? 'font-semibold text-foreground' : 'text-foreground'
+            }
+          >
             {formatMoney(row.amount)}
           </span>
         ),
@@ -66,7 +138,9 @@ export function RefundsPage() {
         id: 'reason',
         header: 'Reason',
         hideBelow: 'lg',
-        cell: (row) => <span className="text-sm text-muted-foreground">{titleCase(row.reason)}</span>,
+        cell: (row) => (
+          <span className="text-sm text-muted-foreground">{titleCase(row.reason)}</span>
+        ),
       },
       {
         id: 'focus',
@@ -79,62 +153,144 @@ export function RefundsPage() {
       {
         id: 'requested',
         header: 'Requested',
+        className: 'whitespace-nowrap',
         cell: (row) => (
-          <span className="text-xs text-muted-foreground">{formatRelativeTime(row.requestedAt)}</span>
+          <span className="text-xs text-muted-foreground">
+            {formatRelativeTime(row.requestedAt)}
+          </span>
         ),
       },
     ],
     [],
   )
 
+  const data = metrics.data
+  const filtersActive = JSON.stringify(filters) !== JSON.stringify(defaultFilters)
+
   return (
     <>
       <PageHeader
         title="Refund operations"
         breadcrumbs={[{ label: 'Refunds' }]}
-        description="Queue of synthetic refund requests with the operational issue that should drive each decision."
+        description="Refund requests with the operational issue that should drive each decision. Approval and processor completion are tracked separately."
       />
       <PageBody>
         <MetricRow>
           <MetricCard
             label="Requests today"
-            value={metrics.data?.requestsToday ?? '--'}
-            hint={metrics.data ? `${formatMoney(metrics.data.requestedAmountToday, { compact: true })} requested` : undefined}
+            value={data?.requestsToday ?? '--'}
+            hint={
+              data
+                ? `${formatMoney(data.requestedAmountToday, { compact: true })} requested`
+                : undefined
+            }
           />
-          <MetricCard label="Pending review" value={metrics.data?.pendingReview ?? '--'} hint="Awaiting an operator" />
+          <MetricCard
+            label="Pending review"
+            value={data?.pendingReview ?? '--'}
+            hint="Awaiting an operator. Select to filter."
+            onClick={() =>
+              setFilters((current) => ({ ...current, status: 'pending_review' }))
+            }
+          />
           <MetricCard
             label="Avg. processing"
-            value={metrics.data ? `${metrics.data.averageProcessingHours}h` : '--'}
+            value={data ? `${data.averageProcessingHours}h` : '--'}
             hint="Request to settlement"
           />
           <MetricCard
             label="Failure rate"
-            value={metrics.data ? formatPercent(metrics.data.failureRatePct, 1) : '--'}
-            tone={metrics.data && metrics.data.failureRatePct > 10 ? 'warning' : 'default'}
-            hint="Processor failures in the sample"
+            value={data ? formatPercent(data.failureRatePct, 1) : '--'}
+            tone={data && data.failureRatePct > 10 ? 'warning' : 'default'}
+            hint="Processor failures. Select to filter."
+            onClick={() => setFilters((current) => ({ ...current, status: 'failed' }))}
           />
         </MetricRow>
 
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+          <Panel title="Refund volume" description="Requests per day over the last 7 days">
+            {data ? <VolumeChart trend={data.volumeTrend} /> : <div className="h-[170px]" />}
+          </Panel>
+          <Panel title="Reason breakdown" description="Select a reason to filter the queue">
+            {data ? (
+              <ReasonBreakdown
+                breakdown={data.reasonBreakdown}
+                activeReason={filters.reason}
+                onSelect={(reason) => setFilters((current) => ({ ...current, reason }))}
+              />
+            ) : null}
+          </Panel>
+        </div>
+
         <Panel
           title="Refund queue"
-          description="Approval is not the same as processor completion; both states appear here."
+          description="High-value and failed refunds are escalated in the list."
           bodyClassName="p-0"
         >
           <FilterBar
-            search={{ value: search, onChange: setSearch, placeholder: 'Search refund, payment, or customer' }}
+            search={{
+              value: filters.search,
+              onChange: (search) => setFilters((current) => ({ ...current, search })),
+              placeholder: 'Search refund, payment, or customer',
+            }}
             trailing={
-              <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
-                <input
-                  type="checkbox"
-                  checked={highValueOnly}
-                  onChange={(event) => setHighValueOnly(event.target.checked)}
-                  className="h-3.5 w-3.5 rounded border-input"
-                />
-                High value only ($2,500+)
-              </label>
+              <>
+                <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={filters.highValueOnly}
+                    onChange={(event) =>
+                      setFilters((current) => ({
+                        ...current,
+                        highValueOnly: event.target.checked,
+                      }))
+                    }
+                    className="h-3.5 w-3.5 rounded border-input accent-navy-700"
+                  />
+                  High value only ($2,500+)
+                </label>
+                {filtersActive ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 text-xs"
+                    onClick={() => setFilters(defaultFilters)}
+                  >
+                    <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+                    Clear filters
+                  </Button>
+                ) : null}
+              </>
             }
           >
-            <FilterSelect label="Status" value={status} onChange={setStatus} options={statusOptions} />
+            <FilterSelect
+              label="Status"
+              value={filters.status}
+              onChange={(status) => setFilters((current) => ({ ...current, status }))}
+              options={statusOptions}
+              triggerClassName="w-[180px]"
+            />
+            <FilterSelect
+              label="Reason"
+              value={filters.reason}
+              onChange={(reason) => setFilters((current) => ({ ...current, reason }))}
+              options={reasonOptions}
+              triggerClassName="w-[180px]"
+            />
+            <FilterSelect
+              label="Amount"
+              value={filters.amountBand}
+              onChange={(amountBand) => setFilters((current) => ({ ...current, amountBand }))}
+              options={amountOptions}
+              triggerClassName="w-[150px]"
+            />
+            <FilterSelect
+              label="Risk"
+              value={filters.risk}
+              onChange={(risk) => setFilters((current) => ({ ...current, risk }))}
+              options={riskOptions}
+              triggerClassName="w-[130px]"
+            />
           </FilterBar>
           <DataTable
             columns={columns}
@@ -143,29 +299,18 @@ export function RefundsPage() {
             loading={queue.loading}
             onRowClick={(row) => navigate(`/refunds/${row.id}`)}
             rowAccent={(row) =>
-              row.risk === 'critical' ? 'critical' : row.status === 'failed' ? 'warning' : null
+              row.status === 'failed' || row.risk === 'critical'
+                ? 'critical'
+                : isHighValue(row.amount)
+                  ? 'warning'
+                  : null
             }
             empty={{
               title: 'No refunds match these filters',
-              description: 'Clear the search, status, or high-value filter to see the full synthetic queue.',
+              description: 'Clear the filters to see the full refund queue.',
             }}
           />
         </Panel>
-
-        <ScaffoldNotice
-          planned={[
-            'Seven-day refund volume chart and reason breakdown',
-            'Filters for reason, amount band, and risk with saved filter state',
-            'Approve, reject, escalate, and note actions with required reasons and confirmation',
-            'Simulated dual approval for high-value refunds, blocking the same user twice',
-            'Retry handling for processor failures, with completed refunds read-only',
-          ]}
-          available={[
-            'Refund metrics and queue served through the async service layer',
-            'Review-focus column derived from the ranked operational signals',
-            'High-value shortcut and status filtering',
-          ]}
-        />
       </PageBody>
     </>
   )

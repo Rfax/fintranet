@@ -94,7 +94,7 @@ export function SidebarNav({ collapsed, onToggleCollapsed, onNavigate, className
       <div className="border-t border-navy-800 p-2">
         {collapsed ? null : (
           <p className="px-1.5 pb-2 text-2xs leading-4 text-navy-400">
-            Prototype build. Synthetic data only.
+            Internal tooling · Operations
           </p>
         )}
         {onToggleCollapsed ? (

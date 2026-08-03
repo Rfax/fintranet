@@ -7,8 +7,8 @@ const usd = (amountMajor: number) => ({
 })
 
 /**
- * Five deliberately different synthetic cases. Each one is built so the
- * adaptive detail view has a distinct dominant signal to lead with.
+ * Each case carries a distinct dominant signal so the adaptive detail view
+ * has a different panel to lead with.
  */
 export const kycCases: KycCase[] = [
   {
@@ -38,7 +38,7 @@ export const kycCases: KycCase[] = [
           { label: 'Customer nationality', value: 'CY', conflicting: true },
           { label: 'Watchlist nationality', value: 'RU', conflicting: true },
         ],
-        source: 'Sanctions screening (synthetic provider)',
+        source: 'Sanctions screening',
         detectedAt: hoursAgo(37),
       },
       {
@@ -54,7 +54,7 @@ export const kycCases: KycCase[] = [
           { label: 'Share of inbound volume', value: '41%' },
           { label: 'Policy', value: 'EDD-07 enhanced diligence list' },
         ],
-        source: 'Transaction monitoring (synthetic)',
+        source: 'Transaction monitoring',
         detectedAt: hoursAgo(36),
       },
     ],
@@ -121,21 +121,21 @@ export const kycCases: KycCase[] = [
       {
         check: 'Sanctions and PEP screening',
         outcome: 'failed',
-        provider: 'ScreenGuard (synthetic)',
+        provider: 'ScreenGuard',
         checkedAt: hoursAgo(37),
         detail: 'Strong potential match requiring manual adjudication.',
       },
       {
         check: 'Identity document authenticity',
         outcome: 'passed',
-        provider: 'DocVerify (synthetic)',
+        provider: 'DocVerify',
         checkedAt: hoursAgo(37),
         detail: 'Passport security features validated.',
       },
       {
         check: 'Address verification',
         outcome: 'passed',
-        provider: 'AddressNet (synthetic)',
+        provider: 'AddressNet',
         checkedAt: hoursAgo(37),
         detail: 'Utility bill matches submitted address.',
       },
@@ -169,6 +169,22 @@ export const kycCases: KycCase[] = [
         createdAt: hoursAgo(20),
       },
     ],
+    sanctionsMatch: {
+      listName: 'Consolidated sanctions list (OFAC/EU/UK merge)',
+      entryName: 'Aleksandr V. Volkov',
+      entryAliases: ['A. Volkov', 'Alexander Volkoff'],
+      nameMatchStrength: 0.86,
+      screenedAt: hoursAgo(37),
+      comparisons: [
+        { field: 'Full name', left: 'Aleksandr Volkov', right: 'Aleksandr V. Volkov', agrees: true },
+        { field: 'Date of birth', left: '1979-04-12', right: '1979-04-12', agrees: true },
+        { field: 'Nationality', left: 'CY', right: 'RU', agrees: false },
+        { field: 'Place of birth', left: 'Limassol, CY', right: 'Kaliningrad, RU', agrees: false },
+        { field: 'Known address', left: '14 Agiou Andreou, Limassol', right: 'Not published', agrees: false },
+      ],
+      entryNotes:
+        'Listed 2022 under maritime logistics designations. The entry carries no passport number, so identity cannot be excluded on documents alone.',
+    },
   },
   {
     id: 'KYC-4834',
@@ -196,7 +212,7 @@ export const kycCases: KycCase[] = [
           { label: 'Extracted DOB', value: '1991-03-08', conflicting: true },
           { label: 'Extraction confidence', value: '0.72' },
         ],
-        source: 'DocVerify OCR (synthetic)',
+        source: 'DocVerify OCR',
         detectedAt: hoursAgo(19),
       },
       {
@@ -210,7 +226,7 @@ export const kycCases: KycCase[] = [
           { label: 'Document date', value: '7 months ago', conflicting: true },
           { label: 'Policy maximum age', value: '3 months' },
         ],
-        source: 'Document policy check (synthetic)',
+        source: 'Document policy check',
         detectedAt: hoursAgo(19),
       },
     ],
@@ -259,21 +275,21 @@ export const kycCases: KycCase[] = [
       {
         check: 'Sanctions and PEP screening',
         outcome: 'passed',
-        provider: 'ScreenGuard (synthetic)',
+        provider: 'ScreenGuard',
         checkedAt: hoursAgo(19),
         detail: 'No matches above threshold.',
       },
       {
         check: 'Identity document authenticity',
         outcome: 'inconclusive',
-        provider: 'DocVerify (synthetic)',
+        provider: 'DocVerify',
         checkedAt: hoursAgo(19),
         detail: 'Diacritics reduced OCR confidence on two fields.',
       },
       {
         check: 'Address verification',
         outcome: 'failed',
-        provider: 'AddressNet (synthetic)',
+        provider: 'AddressNet',
         checkedAt: hoursAgo(19),
         detail: 'Proof of address exceeds the allowed age.',
       },
@@ -299,6 +315,23 @@ export const kycCases: KycCase[] = [
     ],
     linkedIdentities: [],
     notes: [],
+    documentComparison: {
+      documentId: 'DOC-9930',
+      documentType: 'National ID',
+      extractionConfidence: 0.72,
+      documentValidUntil: daysFromNow(1_400),
+      comparisons: [
+        { field: 'Given name', left: 'Marta', right: 'Marta', agrees: true },
+        { field: 'Family name', left: 'Cwiklinska', right: 'Ćwiklińska', agrees: false },
+        { field: 'Date of birth', left: '1991-08-03', right: '1991-03-08', agrees: false },
+        { field: 'Document number', left: 'ABC 123456', right: 'ABC 123456', agrees: true },
+        { field: 'Nationality', left: 'PL', right: 'PL', agrees: true },
+      ],
+      anomalies: [
+        'Glare across the machine-readable zone reduced confidence to 0.72',
+        'Day and month may have been transposed during entry',
+      ],
+    },
   },
   {
     id: 'KYC-4840',
@@ -325,7 +358,7 @@ export const kycCases: KycCase[] = [
           { label: 'Counterparty volume in scope', value: '62%' },
           { label: 'Source of address data', value: 'Utility bill + device geolocation' },
         ],
-        source: 'Jurisdiction policy engine (synthetic)',
+        source: 'Jurisdiction policy engine',
         detectedAt: hoursAgo(63),
       },
       {
@@ -336,7 +369,7 @@ export const kycCases: KycCase[] = [
         headline: 'Source-of-wealth documentation not supplied',
         explanation: 'Enhanced diligence requires supporting evidence for declared business income.',
         evidence: [{ label: 'Requested', value: 'Company registration, 6 months of statements' }],
-        source: 'Case checklist (synthetic)',
+        source: 'Case checklist',
         detectedAt: hoursAgo(63),
       },
     ],
@@ -402,14 +435,14 @@ export const kycCases: KycCase[] = [
       {
         check: 'Sanctions and PEP screening',
         outcome: 'passed',
-        provider: 'ScreenGuard (synthetic)',
+        provider: 'ScreenGuard',
         checkedAt: hoursAgo(63),
         detail: 'No matches above threshold.',
       },
       {
         check: 'Identity document authenticity',
         outcome: 'passed',
-        provider: 'DocVerify (synthetic)',
+        provider: 'DocVerify',
         checkedAt: hoursAgo(63),
         detail: 'Passport validated.',
       },
@@ -434,6 +467,28 @@ export const kycCases: KycCase[] = [
     ],
     linkedIdentities: [],
     notes: [],
+    jurisdiction: {
+      policyId: 'EDD-04',
+      policyName: 'Enhanced diligence: high-risk jurisdictions',
+      policyStatement:
+        'Customers resident in, or transacting materially with, a listed jurisdiction require senior review and documented source of wealth before approval.',
+      connections: [
+        { country: 'NG', connection: 'Country of residence and registered business address', source: 'Onboarding profile', tier: 'enhanced_diligence' },
+        { country: 'NG', connection: '62% of counterparty volume, including aggregated cash deposits', source: 'Transaction monitoring', tier: 'enhanced_diligence' },
+        { country: 'CN', connection: 'Supplier payments to a single trading company', source: 'Payment rails', tier: 'monitored' },
+        { country: 'GB', connection: 'Secondary settlement account', source: 'Payment rails', tier: 'standard' },
+      ],
+      strengthening: [
+        'Cash share of 19% against a 6% cohort norm for merchant services',
+        'Source-of-wealth evidence requested 63 hours ago and not supplied',
+        'One counterparty flagged as an aggregated cash deposit point',
+      ],
+      weakening: [
+        'Sanctions and PEP screening returned no matches',
+        'Passport validated with 0.95 extraction confidence',
+        'Supplier relationship is consistent with the declared import/export business',
+      ],
+    },
   },
   {
     id: 'KYC-4852',
@@ -459,7 +514,7 @@ export const kycCases: KycCase[] = [
           { label: 'Shared phone', value: '+353 85 220 4411', conflicting: true },
           { label: 'Shared address', value: '22 Grattan Court, Dublin' },
         ],
-        source: 'Identity graph (synthetic)',
+        source: 'Identity graph',
         detectedAt: hoursAgo(8),
       },
     ],
@@ -508,21 +563,21 @@ export const kycCases: KycCase[] = [
       {
         check: 'Sanctions and PEP screening',
         outcome: 'passed',
-        provider: 'ScreenGuard (synthetic)',
+        provider: 'ScreenGuard',
         checkedAt: hoursAgo(8),
         detail: 'No matches above threshold.',
       },
       {
         check: 'Identity document authenticity',
         outcome: 'passed',
-        provider: 'DocVerify (synthetic)',
+        provider: 'DocVerify',
         checkedAt: hoursAgo(8),
         detail: 'Driving licence validated.',
       },
       {
         check: 'Duplicate identity screening',
         outcome: 'failed',
-        provider: 'Identity graph (synthetic)',
+        provider: 'Identity graph',
         checkedAt: hoursAgo(8),
         detail: 'Two candidate matches above the 0.75 threshold.',
       },
@@ -580,7 +635,7 @@ export const kycCases: KycCase[] = [
           { label: 'Checks passed', value: '4 of 5' },
           { label: 'Pending', value: 'Employment verification' },
         ],
-        source: 'Case checklist (synthetic)',
+        source: 'Case checklist',
         detectedAt: hoursAgo(4),
       },
     ],
@@ -636,21 +691,21 @@ export const kycCases: KycCase[] = [
       {
         check: 'Sanctions and PEP screening',
         outcome: 'passed',
-        provider: 'ScreenGuard (synthetic)',
+        provider: 'ScreenGuard',
         checkedAt: hoursAgo(4),
         detail: 'No matches above threshold.',
       },
       {
         check: 'Identity document authenticity',
         outcome: 'passed',
-        provider: 'DocVerify (synthetic)',
+        provider: 'DocVerify',
         checkedAt: hoursAgo(4),
         detail: 'Passport validated.',
       },
       {
         check: 'Address verification',
         outcome: 'passed',
-        provider: 'AddressNet (synthetic)',
+        provider: 'AddressNet',
         checkedAt: hoursAgo(4),
         detail: 'Address confirmed against utility record.',
       },
@@ -676,9 +731,167 @@ export const kycCases: KycCase[] = [
     linkedIdentities: [],
     notes: [],
   },
+  {
+    id: 'KYC-4866',
+    customerId: 'CUS-91414',
+    customerName: 'Camila Rojas',
+    country: 'CO',
+    status: 'info_requested',
+    assigneeId: 'usr_sofia',
+    submittedAt: hoursAgo(31),
+    slaDueAt: hoursFromNow(5),
+    overallRisk: 'medium',
+    riskSignals: [
+      {
+        id: 'sig_4866_1',
+        type: 'address_verification_failure',
+        severity: 'medium',
+        confidence: 0.79,
+        headline: 'Residential address could not be verified against any evidence source',
+        explanation:
+          'The submitted address normalises to a commercial mail-forwarding suite. No utility, credit, or electoral record ties the customer to it.',
+        evidence: [
+          { label: 'Submitted address', value: 'Cra 11 #93-45 Of. 508, Bogota', conflicting: true },
+          { label: 'Normalised', value: 'CRA 11 93 45 OFC 508, BOGOTA DC' },
+          { label: 'Provider result', value: 'Commercial mailbox, no occupancy', conflicting: true },
+          { label: 'Evidence sources checked', value: '3' },
+        ],
+        source: 'Address verification',
+        detectedAt: hoursAgo(30),
+      },
+      {
+        id: 'sig_4866_2',
+        type: 'incomplete_evidence',
+        severity: 'low',
+        confidence: 0.5,
+        headline: 'Replacement proof of address requested from the customer',
+        explanation: 'A bank statement or lease naming the residential address would resolve the failure.',
+        evidence: [
+          { label: 'Requested', value: 'Lease or bank statement, last 3 months' },
+          { label: 'Requested at', value: '29 hours ago' },
+        ],
+        source: 'Case checklist',
+        detectedAt: hoursAgo(29),
+      },
+    ],
+    profile: {
+      fullName: 'Camila Rojas',
+      dateOfBirth: '1990-09-14',
+      nationality: 'CO',
+      residenceCountry: 'CO',
+      occupation: 'Freelance graphic designer',
+      declaredAnnualIncome: usd(46_000),
+      sourceOfFunds: 'Client invoices',
+      email: 'c.rojas@example.com',
+      phone: '+57 310 774 2210',
+      addressLine: 'Cra 11 #93-45 Of. 508, Bogota',
+      customerSince: daysAgo(22),
+    },
+    accounts: [
+      {
+        id: 'ACC-78700',
+        product: 'checking',
+        status: 'restricted',
+        openedAt: daysAgo(22),
+        balance: usd(7_450),
+      },
+    ],
+    transactionSummary: {
+      monthlyInflow: usd(3_900),
+      monthlyOutflow: usd(3_150),
+      monthlyTransactionCount: 24,
+      largestSingleTransfer: usd(1_800),
+      cashSharePct: 3,
+      cryptoSharePct: 0,
+      primaryGeographies: ['CO', 'US'],
+      observations: [
+        'Inflows match the declared freelance income within 8%.',
+        'Every counterparty is a named design agency; none are flagged.',
+      ],
+    },
+    counterparties: [
+      {
+        name: 'Norte Creative Studio',
+        country: 'CO',
+        relationship: 'Client invoices',
+        volume: usd(14_200),
+        flagged: false,
+      },
+      {
+        name: 'Halyard Design LLC',
+        country: 'US',
+        relationship: 'Client invoices',
+        volume: usd(9_600),
+        flagged: false,
+      },
+    ],
+    verificationResults: [
+      {
+        check: 'Sanctions and PEP screening',
+        outcome: 'passed',
+        provider: 'ScreenGuard',
+        checkedAt: hoursAgo(30),
+        detail: 'No matches above threshold.',
+      },
+      {
+        check: 'Identity document authenticity',
+        outcome: 'passed',
+        provider: 'DocVerify',
+        checkedAt: hoursAgo(30),
+        detail: 'National ID validated with 0.96 confidence.',
+      },
+      {
+        check: 'Address verification',
+        outcome: 'failed',
+        provider: 'AddressNet',
+        checkedAt: hoursAgo(30),
+        detail: 'Address resolves to a commercial mailbox with no occupancy record.',
+      },
+    ],
+    documents: [
+      {
+        id: 'DOC-9995',
+        type: 'national_id',
+        fileName: 'cedula_rojas.jpg',
+        uploadedAt: hoursAgo(31),
+        expiresAt: daysFromNow(2_100),
+        extractionConfidence: 0.96,
+        anomalies: [],
+      },
+      {
+        id: 'DOC-9996',
+        type: 'utility_bill',
+        fileName: 'factura_energia.pdf',
+        uploadedAt: hoursAgo(31),
+        extractionConfidence: 0.84,
+        anomalies: ['Billing address differs from the submitted residential address'],
+      },
+    ],
+    linkedIdentities: [],
+    notes: [
+      {
+        id: 'NOTE-3310',
+        authorId: 'usr_sofia',
+        authorName: 'Sofia Lind',
+        body: 'Customer says the office suite is a coworking mailbox they use for client post. Waiting on a lease.',
+        createdAt: hoursAgo(28),
+      },
+    ],
+    addressVerification: {
+      provider: 'AddressNet',
+      checkedAt: hoursAgo(30),
+      submitted: 'Cra 11 #93-45 Of. 508, Bogota, CO',
+      normalized: 'CRA 11 93 45 OFC 508, BOGOTA DC, CO',
+      verified: 'No occupancy record found',
+      mismatchedComponents: ['Unit type (office vs. residential)', 'Occupancy record', 'Utility billing address'],
+      providerResponse: 'MAILBOX_COMMERCIAL — deliverable, but registered as a mail-forwarding suite.',
+      evidenceSource: 'Utility bill naming Calle 106 #15-22 Apto 302',
+      evidenceDate: daysAgo(38),
+    },
+  },
 ]
 
-/** Fourteen days of synthetic workload history for the overview charts. */
+/** Fourteen days of workload history for the overview charts. */
 export const kycTrend: KycTrendPoint[] = Array.from({ length: 14 }, (_, index) => {
   const daysBack = 13 - index
   const received = 18 + ((index * 5) % 9)

@@ -55,7 +55,7 @@ export function Panel({
 
 interface DetailListProps {
   items: { label: string; value: ReactNode; emphasis?: boolean }[]
-  columns?: 1 | 2 | 3
+  columns?: 1 | 2 | 3 | 4
   className?: string
 }
 
@@ -68,6 +68,7 @@ export function DetailList({ items, columns = 2, className }: DetailListProps) {
         columns === 1 && 'grid-cols-1',
         columns === 2 && 'grid-cols-1 sm:grid-cols-2',
         columns === 3 && 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-3',
+        columns === 4 && 'grid-cols-2 xl:grid-cols-4',
         className,
       )}
     >

@@ -1,8 +1,8 @@
-import type { FeatureFlag, SyntheticFlagUser } from '@/types'
+import type { FeatureFlag, FlagUser } from '@/types'
 import { daysAgo, daysFromNow, hoursAgo } from './time'
 
-/** Synthetic end users used by the effective-flag debugger. */
-export const syntheticFlagUsers: SyntheticFlagUser[] = [
+/** End users the debugger and audience previews resolve flags against. */
+export const flagUsers: FlagUser[] = [
   {
     id: 'u_10231',
     name: 'Ana Ferreira',
@@ -27,6 +27,54 @@ export const syntheticFlagUsers: SyntheticFlagUser[] = [
     country: 'JP',
     segments: ['enterprise_pilot'],
   },
+  {
+    id: 'u_10844',
+    name: 'Ingrid Halvorsen',
+    email: 'ingrid.halvorsen@example.com',
+    plan: 'pro',
+    country: 'NO',
+    segments: ['beta_testers'],
+  },
+  {
+    id: 'u_11015',
+    name: 'Rafael Duarte',
+    email: 'rafael.duarte@example.com',
+    plan: 'free',
+    country: 'BR',
+    segments: ['high_volume'],
+  },
+  {
+    id: 'u_11190',
+    name: 'Nour Haddad',
+    email: 'nour.haddad@example.com',
+    plan: 'enterprise',
+    country: 'AE',
+    segments: ['enterprise_pilot', 'high_volume'],
+  },
+  {
+    id: 'u_11322',
+    name: 'Owen Blackwood',
+    email: 'owen.blackwood@example.com',
+    plan: 'free',
+    country: 'GB',
+    segments: [],
+  },
+  {
+    id: 'u_11476',
+    name: 'Sanne de Vries',
+    email: 'sanne.devries@example.com',
+    plan: 'pro',
+    country: 'NL',
+    segments: [],
+  },
+]
+
+/** Segments targeting rules can be pointed at. */
+export const flagSegments = [
+  'beta_testers',
+  'high_volume',
+  'enterprise_pilot',
+  'internal_staff',
 ]
 
 export const featureFlags: FeatureFlag[] = [
@@ -111,6 +159,7 @@ return useInstantV2 ? instantRailV2(payout) : sameDayRail(payout)`,
         highlightLine: 2,
         lastModifiedAt: daysAgo(6),
         lastModifiedBy: 'Jonah Beckett',
+        coversDisabledPath: true,
       },
       {
         id: 'loc_ip_3',
@@ -164,7 +213,7 @@ label.text = if (instant) R.string.payout_instant else R.string.payout_same_day`
           { label: 'Rollout', value: '35%' },
           { label: 'Estimated audience', value: '148,400 users' },
         ],
-        source: 'Flag service (synthetic)',
+        source: 'Flag service',
         detectedAt: hoursAgo(9),
       },
       {
@@ -178,7 +227,7 @@ label.text = if (instant) R.string.payout_instant else R.string.payout_same_day`
           { label: 'Current stage', value: 'Broad (35%)' },
           { label: 'Next stage', value: 'General availability (100%)' },
         ],
-        source: 'Rollout plan (synthetic)',
+        source: 'Rollout plan',
         detectedAt: hoursAgo(9),
       },
     ],
@@ -218,6 +267,7 @@ return statement_export_v3(account, period)`,
         highlightLine: 1,
         lastModifiedAt: daysAgo(520),
         lastModifiedBy: 'Marcus Hale',
+        cleanupCandidate: true,
       },
     ],
     dependencies: [],
@@ -238,7 +288,7 @@ return statement_export_v3(account, period)`,
           { label: 'Code references', value: '1' },
           { label: 'Owner', value: 'Core Banking' },
         ],
-        source: 'Flag hygiene scan (synthetic)',
+        source: 'Flag hygiene scan',
         detectedAt: daysAgo(2),
       },
     ],
@@ -317,7 +367,7 @@ return adaptive ? <AdaptiveCaseHeader case={kycCase} /> : <UniformCaseHeader cas
           { label: 'Production state', value: 'Disabled' },
           { label: 'Staging rollout', value: '50%' },
         ],
-        source: 'Flag service (synthetic)',
+        source: 'Flag service',
         detectedAt: hoursAgo(4),
       },
     ],
@@ -337,7 +387,14 @@ return adaptive ? <AdaptiveCaseHeader case={kycCase} /> : <UniformCaseHeader cas
     environments: [
       { environment: 'development', enabled: true, rolloutPercentage: 100, updatedAt: daysAgo(9), updatedById: 'usr_mateo' },
       { environment: 'staging', enabled: true, rolloutPercentage: 100, updatedAt: daysAgo(9), updatedById: 'usr_mateo' },
-      { environment: 'production', enabled: false, rolloutPercentage: 0, updatedAt: hoursAgo(2), updatedById: 'usr_mateo' },
+      {
+        environment: 'production',
+        enabled: false,
+        rolloutPercentage: 0,
+        updatedAt: hoursAgo(2),
+        updatedById: 'usr_mateo',
+        previous: { enabled: true, rolloutPercentage: 100, changedAt: hoursAgo(2) },
+      },
     ],
     targetingRules: [],
     personalOverrides: [],
@@ -384,7 +441,7 @@ if flags.Enabled(ctx, "refund-auto-approve-threshold") {
           { label: 'After', value: 'production: off, 0%', conflicting: true },
           { label: 'Changed by', value: 'Mateo Alvarez' },
         ],
-        source: 'Flag activity (synthetic)',
+        source: 'Flag activity',
         detectedAt: hoursAgo(2),
       },
       {
@@ -395,7 +452,7 @@ if flags.Enabled(ctx, "refund-auto-approve-threshold") {
         headline: 'Blocked by instant-payout-v2 rollout',
         explanation: 'Re-enabling is gated on the payout rollout reaching general availability.',
         evidence: [{ label: 'Blocking flag', value: 'instant-payout-v2' }],
-        source: 'Dependency graph (synthetic)',
+        source: 'Dependency graph',
         detectedAt: hoursAgo(2),
       },
     ],
@@ -454,7 +511,7 @@ if flags.Enabled(ctx, "refund-auto-approve-threshold") {
         headline: 'One downstream flag depends on this probe',
         explanation: 'instant-payout-v2 requires this flag to stay enabled in production.',
         evidence: [{ label: 'Downstream', value: 'instant-payout-v2' }],
-        source: 'Dependency graph (synthetic)',
+        source: 'Dependency graph',
         detectedAt: daysAgo(90),
       },
     ],
