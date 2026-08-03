@@ -25,7 +25,7 @@ import { TargetingPanel } from '@/components/flags/TargetingPanel'
 import { useAsyncData } from '@/hooks/useAsyncData'
 import { useFlagEnvironment } from '@/hooks/useFlagEnvironment'
 import { useSession } from '@/hooks/useSession'
-import { explainFocusSelection, rankSignals } from '@/logic/focus'
+import { rankSignals } from '@/logic/focus'
 import { formatDate, formatNumber, formatRelativeTime, titleCase } from '@/logic/format'
 import { listActivity } from '@/services/activityService'
 import {
@@ -189,11 +189,6 @@ export function FlagDetailPage() {
           config={config}
           audience={preview.estimatedAudience}
         />
-        {primary ? (
-          <p className="text-xs text-muted-foreground">
-            Why this is first: {explainFocusSelection(flag.signals)} Source: {primary.source}.
-          </p>
-        ) : null}
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
           <Panel

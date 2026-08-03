@@ -11,7 +11,6 @@ import { Link } from 'react-router'
 import { cn } from '@/lib/utils'
 import { Pill } from '@/components/shared/Badges'
 import { DetailList, Panel } from '@/components/shared/Panel'
-import { flagFocusLabel } from '@/logic/focus'
 import { formatDate, formatNumber, formatRelativeTime } from '@/logic/format'
 import type { EnvironmentConfig, FeatureFlag, FlagSignal, FlagSignalType } from '@/types'
 
@@ -22,6 +21,15 @@ const panelIcon: Record<FlagSignalType, typeof Radio> = {
   scheduled_rollout: CalendarClock,
   dependent_flag: Link2,
   development_flag: FlaskConical,
+}
+
+const panelTitle: Record<FlagSignalType, string> = {
+  broad_production_exposure: 'Production exposure',
+  recent_risky_change: 'Recent configuration change',
+  stale_flag: 'Stale flag cleanup',
+  scheduled_rollout: 'Rollout schedule',
+  dependent_flag: 'Flag dependencies',
+  development_flag: 'Development-only flag',
 }
 
 interface FlagFocusPanelProps {
@@ -37,13 +45,10 @@ export function FlagFocusPanel({ flag, signal, config, audience }: FlagFocusPane
   const Icon = type ? panelIcon[type] : Ban
 
   const header = (
-    <span className="flex flex-col">
-      <span className="text-label">Operational focus</span>
-      <span className="flex items-center gap-2">
-        <Icon className="h-4 w-4 text-navy-700" aria-hidden />
-        <span className="text-base font-semibold text-foreground">
-          {type ? flagFocusLabel(type) : 'No operational concern'}
-        </span>
+    <span className="flex items-center gap-2">
+      <Icon className="h-4 w-4 text-navy-700" aria-hidden />
+      <span className="text-base font-semibold text-foreground">
+        {type ? panelTitle[type] : 'Flag health'}
       </span>
     </span>
   )

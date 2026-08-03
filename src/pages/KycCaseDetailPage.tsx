@@ -17,7 +17,7 @@ import { findUser } from '@/data/users'
 import { useAsyncData } from '@/hooks/useAsyncData'
 import { toQueueFilters, useKycQueueFilters } from '@/hooks/useKycQueueFilters'
 import { useSession } from '@/hooks/useSession'
-import { explainFocusSelection, kycFocusLabel, rankSignals } from '@/logic/focus'
+import { kycFocusLabel, rankSignals } from '@/logic/focus'
 import {
   formatDate,
   formatDuration,
@@ -33,7 +33,7 @@ import {
   assignKycCase,
   decideKycCase,
   getKycCase,
-  getNextCaseId,
+  getNextCase,
   type KycDecision,
 } from '@/services/kycService'
 
@@ -64,6 +64,34 @@ const decisionCopy: Record<
   },
 }
 
+function NextCaseButton({
+  remaining,
+  disabled,
+  onClick,
+  variant,
+}: {
+  remaining: number
+  disabled: boolean
+  onClick: () => void
+  variant: 'ghost' | 'outline'
+}) {
+  return (
+    <Button
+      variant={variant}
+      size="sm"
+      disabled={disabled}
+      onClick={onClick}
+      title={disabled ? 'No other cases match the current queue filters' : undefined}
+    >
+      Next case
+      <span className="ml-1.5 text-xs text-muted-foreground">
+        {remaining === 0 ? 'none left' : `${remaining} left`}
+      </span>
+      <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+    </Button>
+  )
+}
+
 export function KycCaseDetailPage() {
   const { caseId = '' } = useParams()
   const navigate = useNavigate()
@@ -83,17 +111,23 @@ export function KycCaseDetailPage() {
     () => listActivity({ module: 'kyc', recordId: kycCase?.id ?? caseId }),
     [kycCase?.id, caseId],
   )
+  const nextCase = useAsyncData(
+    () => getNextCase(caseId, toQueueFilters(queueFilters)),
+    [caseId, queueFilters, kycCase?.status],
+  )
 
   const refresh = useCallback(() => {
     reload()
     activity.reload()
-  }, [reload, activity])
+    nextCase.reload()
+  }, [reload, activity, nextCase])
 
-  const openNextCase = useCallback(async () => {
-    const nextId = await getNextCaseId(caseId, toQueueFilters(queueFilters))
-    if (nextId) navigate(`/kyc/${nextId}`)
-    else toast.info('No further cases match the current queue filters')
-  }, [caseId, navigate, queueFilters])
+  const remainingCases = nextCase.data?.remaining ?? 0
+  const nextCaseId = nextCase.data?.id ?? null
+
+  const openNextCase = useCallback(() => {
+    if (nextCaseId) navigate(`/kyc/${nextCaseId}`)
+  }, [navigate, nextCaseId])
 
   if (loading) {
     return (
@@ -202,10 +236,12 @@ export function KycCaseDetailPage() {
                 Decided {kycCase.completedAt ? formatRelativeTime(kycCase.completedAt) : ''} by{' '}
                 {findUser(kycCase.decidedById ?? null)?.name ?? 'an operator'}
               </span>
-              <Button variant="outline" size="sm" onClick={openNextCase}>
-                Next case
-                <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
-              </Button>
+              <NextCaseButton
+                variant="outline"
+                remaining={remainingCases}
+                disabled={!nextCaseId}
+                onClick={openNextCase}
+              />
             </>
           ) : (
             <>
@@ -223,10 +259,12 @@ export function KycCaseDetailPage() {
               <Button size="sm" onClick={() => setDecision('approve')}>
                 Approve
               </Button>
-              <Button variant="ghost" size="sm" onClick={openNextCase}>
-                Next case
-                <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
-              </Button>
+              <NextCaseButton
+                variant="ghost"
+                remaining={remainingCases}
+                disabled={!nextCaseId}
+                onClick={openNextCase}
+              />
             </>
           )
         }
@@ -243,14 +281,7 @@ export function KycCaseDetailPage() {
           <div className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
             <EvidencePanel kycCase={kycCase} signal={primary} />
             <Panel
-              title={
-                <span className="flex flex-col">
-                  <span className="text-label">Primary review focus</span>
-                  <span className="text-base font-semibold text-foreground">
-                    {kycFocusLabel(primary.type)}
-                  </span>
-                </span>
-              }
+              title={kycFocusLabel(primary.type)}
               actions={
                 <Pill tone={primary.severity === 'low' ? 'neutral' : 'warning'}>
                   {primary.confidence !== undefined
@@ -258,7 +289,7 @@ export function KycCaseDetailPage() {
                     : 'Confidence not reported'}
                 </Pill>
               }
-              footer={`Why this is first: ${explainFocusSelection(kycCase.riskSignals)} Source: ${primary.source}.`}
+              footer={`Source: ${primary.source}. Detected ${formatRelativeTime(primary.detectedAt)}.`}
               bodyClassName="space-y-3 px-4 py-3"
             >
               <p className="text-sm font-medium text-foreground">{primary.headline}</p>

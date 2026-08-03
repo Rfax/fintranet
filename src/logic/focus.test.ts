@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AttentionSignal } from '@/types'
-import { explainFocusSelection, rankSignals, selectPrimarySignal } from './focus'
+import { rankSignals, selectPrimarySignal } from './focus'
 
 const signal = (
   overrides: Partial<AttentionSignal> & Pick<AttentionSignal, 'id' | 'severity'>,
@@ -44,27 +44,5 @@ describe('selectPrimarySignal', () => {
       signal({ id: 'known', severity: 'high', confidence: 0.1 }),
     ])
     expect(primary?.id).toBe('known')
-  })
-})
-
-describe('explainFocusSelection', () => {
-  it('explains why a signal was promoted', () => {
-    const explanation = explainFocusSelection([
-      signal({ id: 'a', severity: 'critical', confidence: 0.86 }),
-      signal({ id: 'b', severity: 'high', confidence: 0.9 }),
-    ])
-    expect(explanation).toBe('Highest severity (critical) of 2 signals; confidence 0.86.')
-  })
-
-  it('mentions equal-severity competition', () => {
-    const explanation = explainFocusSelection([
-      signal({ id: 'a', severity: 'high', confidence: 0.9 }),
-      signal({ id: 'b', severity: 'high', confidence: 0.4 }),
-    ])
-    expect(explanation).toContain('equal-severity')
-  })
-
-  it('handles records with no signals', () => {
-    expect(explainFocusSelection([])).toBe('No signals were raised for this record.')
   })
 })

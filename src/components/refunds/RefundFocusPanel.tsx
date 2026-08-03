@@ -4,7 +4,6 @@ import { cn } from '@/lib/utils'
 import { Pill, StatusBadge } from '@/components/shared/Badges'
 import { DetailList, Panel } from '@/components/shared/Panel'
 import { formatDate, formatMoney, formatRelativeTime, titleCase } from '@/logic/format'
-import { refundFocusLabel } from '@/logic/focus'
 import { highValueThreshold, remainingApprovals } from '@/services/refundService'
 import type { RefundRequest, RefundSignal, RefundSignalType } from '@/types'
 
@@ -14,6 +13,14 @@ const panelIcon: Record<RefundSignalType, typeof Banknote> = {
   elevated_fraud_signal: ShieldAlert,
   processor_failure: AlertOctagon,
   standard_request: Sparkles,
+}
+
+const panelTitle: Record<RefundSignalType, string> = {
+  high_value: 'High-value approval',
+  possible_duplicate: 'Possible duplicate refund',
+  elevated_fraud_signal: 'Fraud risk evidence',
+  processor_failure: 'Processor failure',
+  standard_request: 'Standard refund review',
 }
 
 interface RefundFocusPanelProps {
@@ -28,12 +35,9 @@ export function RefundFocusPanel({ refund, signal, related }: RefundFocusPanelPr
   const Icon = panelIcon[type]
 
   const header = (
-    <span className="flex flex-col">
-      <span className="text-label">Operational focus</span>
-      <span className="flex items-center gap-2">
-        <Icon className="h-4 w-4 text-navy-700" aria-hidden />
-        <span className="text-base font-semibold text-foreground">{refundFocusLabel(type)}</span>
-      </span>
+    <span className="flex items-center gap-2">
+      <Icon className="h-4 w-4 text-navy-700" aria-hidden />
+      <span className="text-base font-semibold text-foreground">{panelTitle[type]}</span>
     </span>
   )
 

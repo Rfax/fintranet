@@ -86,12 +86,19 @@ export function getPrimarySignal(kycCase: KycCase): KycRiskSignal | null {
   return selectPrimarySignal(kycCase.riskSignals)
 }
 
+export interface NextCase {
+  /** The case to open next, or null when the queue holds nothing else. */
+  id: string | null
+  /** Undecided cases still in the queue apart from the current one. */
+  remaining: number
+}
+
 /** The next case an operator should pick up under the same queue filters. */
-export function getNextCaseId(
+export function getNextCase(
   currentCaseId: string,
   filters: KycQueueFilters = {},
   now: Date = new Date(),
-): Promise<string | null> {
+): Promise<NextCase> {
   const queue = sortCases(
     cases().filter((kycCase) => matchesFilters(kycCase, filters, now)),
     filters.sort,
@@ -99,7 +106,15 @@ export function getNextCaseId(
 
   const index = queue.findIndex((kycCase) => kycCase.id === currentCaseId)
   const next = index === -1 ? queue[0] : queue[index + 1] ?? queue[0]
-  return respond(next && next.id !== currentCaseId ? next.id : null, 40)
+  const remaining = queue.filter((kycCase) => kycCase.id !== currentCaseId).length
+
+  return respond(
+    {
+      id: remaining > 0 && next && next.id !== currentCaseId ? next.id : null,
+      remaining,
+    },
+    40,
+  )
 }
 
 export type KycDecision = 'approve' | 'reject' | 'request_info'

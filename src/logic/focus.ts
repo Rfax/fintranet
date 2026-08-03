@@ -42,25 +42,6 @@ export function selectPrimarySignal<T extends AttentionSignal>(
   return rankSignals(signals)[0] ?? null
 }
 
-/** Human-readable justification for why a signal was promoted. */
-export function explainFocusSelection(
-  signals: readonly AttentionSignal[],
-): string {
-  const ranked = rankSignals(signals)
-  const primary = ranked[0]
-  if (!primary) return 'No signals were raised for this record.'
-
-  const parts = [`Highest severity (${primary.severity}) of ${signals.length} signal${signals.length === 1 ? '' : 's'}`]
-  const tiedOnSeverity = ranked.filter((signal) => signal.severity === primary.severity)
-  if (tiedOnSeverity.length > 1) {
-    parts.push('ranked ahead of equal-severity signals by confidence')
-  }
-  if (primary.confidence !== undefined) {
-    parts.push(`confidence ${primary.confidence.toFixed(2)}`)
-  }
-  return `${parts.join('; ')}.`
-}
-
 const kycFocusLabels: Record<KycSignalType, string> = {
   sanctions_match: 'Possible sanctions match',
   document_mismatch: 'Document inconsistency',

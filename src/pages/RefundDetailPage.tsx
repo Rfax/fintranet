@@ -14,7 +14,7 @@ import { DetailList, Panel } from '@/components/shared/Panel'
 import { RefundFocusPanel } from '@/components/refunds/RefundFocusPanel'
 import { useAsyncData } from '@/hooks/useAsyncData'
 import { useSession } from '@/hooks/useSession'
-import { explainFocusSelection, rankSignals } from '@/logic/focus'
+import { rankSignals } from '@/logic/focus'
 import {
   formatDate,
   formatMoney,
@@ -255,11 +255,6 @@ export function RefundDetailPage() {
         ) : null}
 
         <RefundFocusPanel refund={refund} signal={primary} related={related.data ?? []} />
-        {primary ? (
-          <p className="text-xs text-muted-foreground">
-            Why this is first: {explainFocusSelection(refund.signals)} Source: {primary.source}.
-          </p>
-        ) : null}
 
         <div className="grid gap-4 lg:grid-cols-2">
           <Panel
