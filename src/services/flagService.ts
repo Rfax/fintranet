@@ -5,6 +5,7 @@ import {
   evaluateFlags,
   previewAudience,
 } from '@/logic/flagEvaluation'
+import { withDerivedSignals } from '@/logic/flagSignals'
 import { selectPrimarySignal } from '@/logic/focus'
 import type {
   ActivityAction,
@@ -68,7 +69,7 @@ export function listFlags(
   const filtered = flags()
     .filter((flag) => matchesFilters(flag, filters, now))
     .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
-  return respond(filtered)
+  return respond(filtered.map(withDerivedSignals))
 }
 
 /** Flags the signed-in operator owns or has an override on. */
@@ -83,7 +84,11 @@ export function listMyFlags(
         (override) => override.userId === userId && override.environment === environment,
       ),
   )
-  return respond(mine.sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)))
+  return respond(
+    mine
+      .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
+      .map(withDerivedSignals),
+  )
 }
 
 export function getFlag(flagKey: string): Promise<FeatureFlag> {
@@ -91,7 +96,7 @@ export function getFlag(flagKey: string): Promise<FeatureFlag> {
   if (!found) {
     return reject(new ServiceError(`No feature flag matches ${flagKey}`, 'not_found'))
   }
-  return respond(found)
+  return respond(withDerivedSignals(found))
 }
 
 export function getPrimarySignal(flag: FeatureFlag): FlagSignal | null {
@@ -294,7 +299,7 @@ export function updateEnvironmentConfig(
     changes,
   )
 
-  return respond(updated)
+  return respond(withDerivedSignals(updated))
 }
 
 export function rollbackEnvironmentConfig(
@@ -334,7 +339,7 @@ export function rollbackEnvironmentConfig(
     ],
   )
 
-  return respond(updated)
+  return respond(withDerivedSignals(updated))
 }
 
 export interface TargetingRuleInput {
@@ -381,7 +386,7 @@ export function addTargetingRule(
     ],
   )
 
-  return respond(updated)
+  return respond(withDerivedSignals(updated))
 }
 
 export function removeTargetingRule(
@@ -421,7 +426,7 @@ export function removeTargetingRule(
     ],
   )
 
-  return respond(updated)
+  return respond(withDerivedSignals(updated))
 }
 
 export interface OverrideInput {
@@ -484,7 +489,7 @@ export function setPersonalOverride(
     ],
   )
 
-  return respond(updated)
+  return respond(withDerivedSignals(updated))
 }
 
 export function clearPersonalOverride(
@@ -523,5 +528,5 @@ export function clearPersonalOverride(
     [{ field: `override.${userId}`, before: String(existing.value), after: 'none' }],
   )
 
-  return respond(updated)
+  return respond(withDerivedSignals(updated))
 }

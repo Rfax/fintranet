@@ -31,17 +31,20 @@ function recordHref(event: ActivityEvent): string {
 interface ActivityTimelineProps {
   events: ActivityEvent[]
   showRecordLink?: boolean
+  emptyTitle?: string
+  emptyDescription?: string
   className?: string
 }
 
-export function ActivityTimeline({ events, showRecordLink = true, className }: ActivityTimelineProps) {
+export function ActivityTimeline({
+  events,
+  showRecordLink = true,
+  emptyTitle = 'No activity yet',
+  emptyDescription = 'Decisions and configuration changes appear here with actor, reason, and before/after values.',
+  className,
+}: ActivityTimelineProps) {
   if (events.length === 0) {
-    return (
-      <EmptyState
-        title="No activity yet"
-        description="Decisions and configuration changes appear here with actor, reason, and before/after values."
-      />
-    )
+    return <EmptyState title={emptyTitle} description={emptyDescription} />
   }
 
   return (

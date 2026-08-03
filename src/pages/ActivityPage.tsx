@@ -169,7 +169,15 @@ export function ActivityPage() {
                 ))}
               </div>
             ) : (
-              <ActivityTimeline events={events} />
+              <ActivityTimeline
+                events={events}
+                emptyTitle={filtersActive ? 'No activity matches these filters' : undefined}
+                emptyDescription={
+                  filtersActive
+                    ? 'Widen the date range or clear the module, actor, and search filters.'
+                    : undefined
+                }
+              />
             )}
           </div>
         </Panel>
